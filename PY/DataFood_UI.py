@@ -40,7 +40,7 @@ class RestauranteUI(tk.Tk):
         self._create_tab_menu_bebidas(notebook)
         self._create_tab_clientes(notebook)
         self._create_tab_ventas(notebook)
-
+   
 
     # ------------------------- UI --------------------------------
 
@@ -214,29 +214,194 @@ class RestauranteUI(tk.Tk):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text="Insumos")
 
-        self._create_tab_content(
-            frame,
-            "Registro de Insumos",
-            [
-                "ID Producción",
-                "Nombre",
-                "Cantidades Disponibles",
-                "Cantidad Dañada",
-                "Lácteos",
-                "Carnes",
-                "Vastimento",
-            ],
-            [
-                "IDInsumos",
-                "IDProducción",
-                "Nombre",
-                "Cantidades Disponibles",
-                "Cantidad Dañada",
-                "Lácteos",
-                "Carnes",
-                "Vastimento",
-            ],
-        )
+        conexion = conectar()
+        cursor = conexion.cursor()
+
+        main_frame = tk.Frame(frame, bg="#F5F1E8")
+        main_frame.pack(fill="both", expand=True)
+
+        # Panel izquierdo
+        left = tk.Frame(main_frame, bg="#E9E2D0", padx=15, pady=15)
+        left.pack(side="left", fill="y")
+
+        tk.Label(left, text="📦 CRUD de Insumos", bg="#E9E2D0",
+                font=("Segoe UI", 12, "bold"), fg="#6A4E23").pack(pady=(0, 10))
+
+        # Campos
+        entries = {}
+
+        # ---- CATEGORÍA (Combobox normal)
+        tk.Label(left, text="Categoría:", bg="#E9E2D0", font=("Segoe UI", 10)).pack(anchor="w")
+        combo_categoria = ttk.Combobox(left, state="readonly")
+        combo_categoria.pack(fill="x", pady=2)
+        entries["Categoría"] = combo_categoria
+
+        cursor.execute("SELECT NombreCategoria FROM CategoriaInsumos ORDER BY NombreCategoria")
+        categorias = [row[0] for row in cursor.fetchall()]
+        combo_categoria["values"] = categorias
+
+        # ---- Nombre
+        tk.Label(left, text="Nombre:", bg="#E9E2D0", font=("Segoe UI", 10)).pack(anchor="w")
+        entry = ttk.Entry(left)
+        entry.pack(fill="x", pady=2)
+        entries["Nombre"] = entry
+
+        # ---- Cantidad Disponible
+        tk.Label(left, text="Cantidad Disponible:", bg="#E9E2D0", font=("Segoe UI", 10)).pack(anchor="w")
+        entry = ttk.Entry(left)
+        entry.pack(fill="x", pady=2)
+        entries["Cantidad Disponible"] = entry
+
+        # ---- Cantidad Dañada
+        tk.Label(left, text="Cantidad Dañada (opcional):", bg="#E9E2D0", font=("Segoe UI", 10)).pack(anchor="w")
+        entry = ttk.Entry(left)
+        entry.pack(fill="x", pady=2)
+        entries["Cantidad Dañada"] = entry
+
+        # ---- BOTONES
+        btn_frame = tk.Frame(left, bg="#E9E2D0")
+        btn_frame.pack(pady=10, fill="x")
+
+        btn_agregar = ttk.Button(btn_frame, text="Agregar")
+        btn_agregar.pack(fill="x", pady=2)
+        btn_editar = ttk.Button(btn_frame, text="Editar")
+        btn_editar.pack(fill="x", pady=2)
+        btn_eliminar = ttk.Button(btn_frame, text="Eliminar")
+        btn_eliminar.pack(fill="x", pady=2)
+        btn_limpiar = ttk.Button(btn_frame, text="Limpiar",
+                                command=lambda: [e.delete(0, tk.END) for e in entries.values() if isinstance(e, ttk.Entry)])
+        btn_limpiar.pack(fill="x", pady=2)
+
+        # ---- Tabla derecha
+        right = ttk.Frame(main_frame)
+        right.pack(side="right", fill="both", expand=True)
+
+        columns = ["IDInsumos", "Categoría", "Nombre", "Cantidad Disponible", "Cantidad Dañada"]
+        tree = self._create_treeview(right, columns)
+
+        # ===================== FUNCIONES =====================
+
+        def cargar_insumos():
+            for i in tree.get_children():
+                tree.delete(i)
+
+            cursor.execute("""
+                SELECT 
+                    I.IDInsumos,
+                    C.NombreCategoria,
+                    I.NombreInsumo,
+                    I.CantidadDisponible,
+                    I.CantidadDañada
+                FROM Insumos I
+                JOIN CategoriaInsumos C
+                    ON C.IDCategoriaInsumos = I.IDCategoriaInsumos
+                ORDER BY I.IDInsumos ASC
+            """)
+
+            for row in cursor.fetchall():
+                tree.insert("", "end", values=list(row))
+
+        def agregar_insumo():
+            try:
+                categoria = entries["Categoría"].get()
+                nombre = entries["Nombre"].get().strip()
+                cant = entries["Cantidad Disponible"].get().strip()
+                danio = entries["Cantidad Dañada"].get().strip()
+
+                if not categoria or not nombre or not cant.isdigit():
+                    msg.showwarning("Atención", "Completa categoría, nombre y cantidad disponible.")
+                    return
+
+                danio = int(danio) if danio.isdigit() else 0
+
+                cursor.execute("SELECT IDCategoriaInsumos FROM CategoriaInsumos WHERE NombreCategoria=?", categoria)
+                id_cat = cursor.fetchone()[0]
+
+                cursor.execute("""
+                    INSERT INTO Insumos (IDCategoriaInsumos, NombreInsumo, CantidadDisponible, CantidadDañada)
+                    VALUES (?, ?, ?, ?)
+                """, (id_cat, nombre, int(cant), danio))
+
+                conexion.commit()
+                msg.showinfo("Éxito", "Insumo agregado.")
+                cargar_insumos()
+
+            except Exception as e:
+                msg.showerror("Error", f"No se pudo agregar:\n{e}")
+
+        def eliminar_insumo():
+            try:
+                sel = tree.selection()
+                if not sel:
+                    msg.showwarning("Atención", "Selecciona un insumo.")
+                    return
+
+                id_ins = tree.item(sel)["values"][0]
+
+                try:
+                    cursor.execute("DELETE FROM Insumos WHERE IDInsumos=?", (id_ins,))
+                    conexion.commit()
+                    cargar_insumos()
+                    msg.showinfo("Éxito", "Insumo eliminado correctamente.")
+                except Exception as e:
+                    # Error por clave foránea → insumo usado en ProveedoresInsumos
+                    if "FK_Proveedor" in str(e) or "REFERENCE" in str(e):
+                        msg.showerror(
+                            "No permitido",
+                            "Este insumo no puede eliminarse porque está relacionado con proveedores."
+                        )
+                    else:
+                        msg.showerror("Error", str(e))
+
+            except Exception as e:
+                msg.showerror("Error general", str(e))
+
+
+        def editar_insumo():
+            try:
+                sel = tree.selection()
+                if not sel:
+                    msg.showwarning("Atención", "Selecciona un insumo.")
+                    return
+
+                id_ins = int(tree.item(sel)["values"][0])
+
+                categoria = entries["Categoría"].get()
+                nombre = entries["Nombre"].get().strip()
+                cant = entries["Cantidad Disponible"].get().strip()
+                danio = entries["Cantidad Dañada"].get().strip()
+
+                if not categoria or not nombre or not cant.isdigit():
+                    msg.showwarning("Atención", "Completa categoría, nombre y cantidad disponible.")
+                    return
+
+                danio = int(danio) if danio.isdigit() else 0
+
+                cursor.execute(
+                    "SELECT IDCategoriaInsumos FROM CategoriaInsumos WHERE NombreCategoria=?",
+                    categoria
+                )
+                id_cat = cursor.fetchone()[0]
+
+                cursor.execute("""
+                    UPDATE Insumos
+                    SET IDCategoriaInsumos=?, NombreInsumo=?, CantidadDisponible=?, CantidadDañada=?
+                    WHERE IDInsumos=?
+                """, (id_cat, nombre, int(cant), danio, id_ins))
+
+                conexion.commit()
+                msg.showinfo("Éxito", "Insumo actualizado.")
+                cargar_insumos()
+
+            except Exception as e:
+             msg.showerror("Error", f"No se pudo editar:\n{e}")
+
+        # Asignar botones
+        btn_agregar.config(command=agregar_insumo)
+        btn_eliminar.config(command=eliminar_insumo)
+        btn_editar.config(command=editar_insumo)
+
+        cargar_insumos()
 
 
     # --------------------------------------------------------- +---------TAB PRODUCCIÓN ----------------
