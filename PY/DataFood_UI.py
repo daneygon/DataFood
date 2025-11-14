@@ -1,9 +1,10 @@
-from conexion_db import conectar # type: ignore
+from conexion_db import conectar  # type: ignore
 import tkinter.messagebox as msg
 
 
 import tkinter as tk
 from tkinter import ttk
+
 
 class RestauranteUI(tk.Tk):
     def __init__(self):
@@ -20,19 +21,26 @@ class RestauranteUI(tk.Tk):
         # --------------- Encabezado ------------------
         header = tk.Frame(self, bg="#C8B88A", height=50)
         header.pack(side="top", fill="x")
-        tk.Label(header, text="  DataFood  |  Sistema de Gestión de Restaurante",
-                 bg="#C8B88A", fg="#ffffff",
-                 font=("Segoe UI", 15, "bold")).pack(pady=5)
+        tk.Label(
+            header,
+            text="  DataFood  |  Sistema de Gestión de Restaurante",
+            bg="#C8B88A",
+            fg="#ffffff",
+            font=("Segoe UI", 15, "bold"),
+        ).pack(pady=5)
 
-        # -------- Notebook (Tabs) 
+        # -------- Notebook (Tabs)
         notebook = ttk.Notebook(self)
         notebook.pack(expand=True, fill="both", padx=10, pady=10)
 
-        self._create_tab_produccion(notebook)
-        self._create_tab_insumos(notebook)
         self._create_tab_proveedores(notebook)
+        self._create_tab_insumos(notebook)
+        self._create_tab_produccion(notebook)
+        self._create_tab_menu_platos(notebook)
+        self._create_tab_menu_bebidas(notebook)
         self._create_tab_clientes(notebook)
         self._create_tab_ventas(notebook)
+
 
     # ------------------------- UI --------------------------------
 
@@ -48,26 +56,28 @@ class RestauranteUI(tk.Tk):
         style.configure("TLabel", background="#F5F1E8", font=("Segoe UI", 10))
         style.configure("TEntry", padding=4, font=("Segoe UI", 10))
 
-        style.configure("TButton",
-                        padding=6,
-                        font=("Segoe UI", 10, "bold"),
-                        background="#FFFFFF")
+        style.configure(
+            "TButton", padding=6, font=("Segoe UI", 10, "bold"), background="#FFFFFF"
+        )
 
         # TreeView
-        style.configure("Treeview",
-                        background="white",
-                        fieldbackground="white",
-                        foreground="black",
-                        rowheight=24)
+        style.configure(
+            "Treeview",
+            background="white",
+            fieldbackground="white",
+            foreground="black",
+            rowheight=24,
+        )
 
-        style.configure("Treeview.Heading",
-                        background="#C8B88A",
-                        foreground="black",
-                        font=("Segoe UI", 10, "bold"))
-
+        style.configure(
+            "Treeview.Heading",
+            background="#C8B88A",
+            foreground="black",
+            font=("Segoe UI", 10, "bold"),
+        )
 
     # ----------------------------------------------------------------------------------- FUNCIÓN TREEVIEW ---------------------
-   
+
     def _create_treeview(self, parent, columns):
         frame = tk.Frame(parent, bg="#F5F1E8")
         frame.pack(fill="both", expand=True)
@@ -90,7 +100,6 @@ class RestauranteUI(tk.Tk):
         tree.pack(fill="both", expand=True)
         return tree
 
-
     # --------------------------------------------------------------------------------- CREATE TABS -----------------------------------
     def _create_tab_content(self, parent, title, labels, tree_columns):
         frame = ttk.Frame(parent)
@@ -103,7 +112,9 @@ class RestauranteUI(tk.Tk):
         canvas = tk.Canvas(left_container, bg="#E9E2D0", highlightthickness=0)
         canvas.pack(side="left", fill="both", expand=True)
 
-        scrollbar_left = ttk.Scrollbar(left_container, orient="vertical", command=canvas.yview)
+        scrollbar_left = ttk.Scrollbar(
+            left_container, orient="vertical", command=canvas.yview
+        )
         scrollbar_left.pack(side="right", fill="y")
 
         canvas.configure(yscrollcommand=scrollbar_left.set)
@@ -115,22 +126,29 @@ class RestauranteUI(tk.Tk):
         # Permitir el scroll cuando el contenido crezca
         def on_configure(event):
             canvas.configure(scrollregion=canvas.bbox("all"))
+
         left.bind("<Configure>", on_configure)
 
         # ---------- Contenido de la izquierda ----------
-        tk.Label(left, text=f"📦 {title}", bg="#E9E2D0",
-                 font=("Segoe UI", 12, "bold"), fg="#6A4E23").pack(pady=5)
+        tk.Label(
+            left,
+            text=f"📦 {title}",
+            bg="#E9E2D0",
+            font=("Segoe UI", 12, "bold"),
+            fg="#6A4E23",
+        ).pack(pady=5)
 
         entries = {}
         for lbl in labels:
-            tk.Label(left, text=lbl + ":", bg="#E9E2D0",
-                     font=("Segoe UI", 10)).pack(anchor="w")
+            tk.Label(left, text=lbl + ":", bg="#E9E2D0", font=("Segoe UI", 10)).pack(
+                anchor="w"
+            )
             entry = ttk.Entry(left)
             entry.pack(fill="x", pady=2)
             entries[lbl] = entry
 
-        #------------------------------------------------------------------------------ Botones
-            # Botones
+        # ------------------------------------------------------------------------------ Botones
+        # Botones
         btn_frame = tk.Frame(left, bg="#E9E2D0")
         btn_frame.pack(pady=10, fill="x")
 
@@ -157,9 +175,71 @@ class RestauranteUI(tk.Tk):
 
         tree = self._create_treeview(right, tree_columns)
         return entries, tree
+    
+    # ---------------- ------------------------------------------------------------------------TAB PROVEEDORES ----------------
+    def _create_tab_proveedores(self, notebook):
+        frame = ttk.Frame(notebook)
+        notebook.add(frame, text="Proveedores")
+
+        self._create_tab_content(
+            frame,
+            "Gestión de Proveedores",
+            [
+                "Nombre Proveedor",
+                "Teléfono",
+                "Precio de Compra",
+                "Cantidad Comprada",
+                "Día",
+                "Mes",
+                "Año",
+                "Hora",
+                "ID Insumo",
+            ],
+            [
+                "IDProveedor",
+                "Nombre Proveedor",
+                "Teléfono",
+                "Precio de Compra",
+                "Cantidad Comprada",
+                "Día",
+                "Mes",
+                "Año",
+                "Hora",
+                "IDInsumo",
+            ],
+        )
+
+     # ---------------- ------------------------------------------------------------------TAB INSUMOS ----------------
+    def _create_tab_insumos(self, notebook):
+        frame = ttk.Frame(notebook)
+        notebook.add(frame, text="Insumos")
+
+        self._create_tab_content(
+            frame,
+            "Registro de Insumos",
+            [
+                "ID Producción",
+                "Nombre",
+                "Cantidades Disponibles",
+                "Cantidad Dañada",
+                "Lácteos",
+                "Carnes",
+                "Vastimento",
+            ],
+            [
+                "IDInsumos",
+                "IDProducción",
+                "Nombre",
+                "Cantidades Disponibles",
+                "Cantidad Dañada",
+                "Lácteos",
+                "Carnes",
+                "Vastimento",
+            ],
+        )
 
 
-# --------------------------------------------------------- +---------TAB PRODUCCIÓN ----------------
+    # --------------------------------------------------------- +---------TAB PRODUCCIÓN ----------------
     def _create_tab_produccion(self, notebook):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text="Producción")
@@ -175,14 +255,27 @@ class RestauranteUI(tk.Tk):
         left = tk.Frame(main_frame, bg="#E9E2D0", padx=15, pady=15)
         left.pack(side="left", fill="y")
 
-        tk.Label(left, text="📦 Registro de Producción", bg="#E9E2D0",
-                font=("Segoe UI", 12, "bold"), fg="#6A4E23").pack(pady=(0, 10))
+        tk.Label(
+            left,
+            text="📦 Registro de Producción",
+            bg="#E9E2D0",
+            font=("Segoe UI", 12, "bold"),
+            fg="#6A4E23",
+        ).pack(pady=(0, 10))
 
-        labels = ["Tipo de Producción", "Categoría", "Nombre", "Cantidad", "Costo Unitario"]
+        labels = [
+            "Tipo de Producción",
+            "Categoría",
+            "Nombre",
+            "Cantidad",
+            "Costo Unitario",
+        ]
         entries = {}
 
         for lbl in labels:
-            tk.Label(left, text=f"{lbl}:", bg="#E9E2D0", font=("Segoe UI", 10)).pack(anchor="w")
+            tk.Label(left, text=f"{lbl}:", bg="#E9E2D0", font=("Segoe UI", 10)).pack(
+                anchor="w"
+            )
             if lbl in ["Tipo de Producción", "Categoría"]:
                 combo = ttk.Combobox(left, state="readonly")
                 combo.pack(fill="x", pady=2)
@@ -205,16 +298,29 @@ class RestauranteUI(tk.Tk):
         btn_editar.pack(fill="x", pady=2)
         btn_eliminar = ttk.Button(btn_frame, text="Eliminar")
         btn_eliminar.pack(fill="x", pady=2)
-        ttk.Button(btn_frame, text="Limpiar",
-                command=lambda: [e.delete(0, tk.END) for e in entries.values() if isinstance(e, ttk.Entry)]
-                ).pack(fill="x", pady=2)
+        ttk.Button(
+            btn_frame,
+            text="Limpiar",
+            command=lambda: [
+                e.delete(0, tk.END)
+                for e in entries.values()
+                if isinstance(e, ttk.Entry)
+            ],
+        ).pack(fill="x", pady=2)
 
         # --- Tabla derecha ---
         right = ttk.Frame(main_frame)
         right.pack(side="right", fill="both", expand=True)
 
-        columns = ["IDProduccion", "Tipo", "Categoría", "Nombre",
-                "Cantidad", "Costo Unitario", "Costo Producción Total"]
+        columns = [
+            "IDProduccion",
+            "Tipo",
+            "Categoría",
+            "Nombre",
+            "Cantidad",
+            "Costo Unitario",
+            "Costo Producción Total",
+        ]
         tree = self._create_treeview(right, columns)
 
         # ===================== FUNCIONES =====================
@@ -290,9 +396,11 @@ class RestauranteUI(tk.Tk):
                         nombre,
                         int(cantidad),
                         f"{float(costo_unit or 0):.2f}",
-                        f"{float(costo_total or 0):.2f}"
-                    ]
+                        f"{float(costo_total or 0):.2f}",
+                    ],
                 )
+
+ # ---------- FUNCIONES CRUD ----------
 
 
         def agregar_produccion():
@@ -303,60 +411,74 @@ class RestauranteUI(tk.Tk):
                 cantidad_str = entries["Cantidad"].get().strip()
                 costo_str = entries["Costo Unitario"].get().strip()
 
-                if not tipo or not categoria or not nombre or not cantidad_str or not costo_str:
+                if (not tipo or not categoria or not nombre or not cantidad_str or not costo_str):
                     msg.showwarning("Atención", "Completa todos los campos.")
                     return
 
-                if not cantidad_str.isdigit() or not costo_str.replace('.', '', 1).isdigit():
+                if (not cantidad_str.isdigit() or not costo_str.replace(".", "", 1).isdigit()):
                     msg.showwarning("Atención", "Cantidad y costo deben ser numéricos.")
                     return
 
                 cantidad = int(cantidad_str)
-                costo = float(costo_str)
+                costo_unit = float(costo_str)
 
-                # Crea registro base en Produccion
+                # Cálculo total
+                costo_total = cantidad * costo_unit
+
+                # Insert base
                 cursor.execute("""
-                    INSERT INTO Produccion (CantidadDeBebidas, CantidadDePlatos, NombreBebida, NombrePlato, CostoPorPlato, CostoPorBebida)
-                    VALUES (NULL, NULL, NULL, NULL, NULL, NULL);
+                    INSERT INTO Produccion (CantidadDeBebidas, CantidadDePlatos,
+                                            NombreBebida, NombrePlato,
+                                            CostoPorPlato, CostoPorBebida,
+                                            CostoProduccionTotal)
+                    VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL)
                 """)
                 conexion.commit()
 
                 cursor.execute("SELECT MAX(IDProduccion) FROM Produccion")
                 id_prod = cursor.fetchone()[0]
 
+                # Plato
                 if tipo == "Plato":
-                    cursor.execute("SELECT IDCategoriaPlatos FROM CategoriaPlatos WHERE NombreCategoria = ?", (categoria,))
+                    cursor.execute("SELECT IDCategoriaPlatos FROM CategoriaPlatos WHERE NombreCategoria=?", (categoria,))
                     id_cat = cursor.fetchone()[0]
+
                     cursor.execute("""
                         INSERT INTO MenuDePlatos (IDProduccion, IDCategoriaPlatos, NombrePlato, Precio)
-                        VALUES (?, ?, ?, ?);
-                    """, (id_prod, id_cat, nombre, costo))
+                        VALUES (?, ?, ?, ?)
+                    """, (id_prod, id_cat, nombre, costo_unit))
+
                     cursor.execute("""
                         UPDATE Produccion
-                        SET CantidadDePlatos = ?, NombrePlato = ?, CostoPorPlato = ?
-                        WHERE IDProduccion = ?;
-                    """, (cantidad, nombre, costo, id_prod))
+                        SET CantidadDePlatos=?, NombrePlato=?, CostoPorPlato=?, CostoProduccionTotal=?
+                        WHERE IDProduccion=?
+                    """, (cantidad, nombre, costo_unit, costo_total, id_prod))
+
+                # Bebida
                 else:
-                    cursor.execute("SELECT IDCategoriaBebidas FROM CategoriaBebidas WHERE NombreCategoria = ?", (categoria,))
+                    cursor.execute("SELECT IDCategoriaBebidas FROM CategoriaBebidas WHERE NombreCategoria=?", (categoria,))
                     id_cat = cursor.fetchone()[0]
+
                     cursor.execute("""
                         INSERT INTO MenuDeBebidas (IDProduccion, IDCategoriaBebidas, NombreBebida, Precio)
-                        VALUES (?, ?, ?, ?);
-                    """, (id_prod, id_cat, nombre, costo))
+                        VALUES (?, ?, ?, ?)
+                    """, (id_prod, id_cat, nombre, costo_unit))
+
                     cursor.execute("""
                         UPDATE Produccion
-                        SET CantidadDeBebidas = ?, NombreBebida = ?, CostoPorBebida = ?
-                        WHERE IDProduccion = ?;
-                    """, (cantidad, nombre, costo, id_prod))
+                        SET CantidadDeBebidas=?, NombreBebida=?, CostoPorBebida=?, CostoProduccionTotal=?
+                        WHERE IDProduccion=?
+                    """, (cantidad, nombre, costo_unit, costo_total, id_prod))
 
                 conexion.commit()
                 msg.showinfo("Éxito", "Registro agregado correctamente.")
                 cargar_produccion()
+
             except Exception as e:
                 msg.showerror("Error", f"No se pudo agregar el registro:\n{e}")
 
+
         def eliminar_produccion():
-            """Elimina Producción + menús + detalles de venta relacionados, de forma segura."""
             try:
                 sel = tree.selection()
                 if not sel:
@@ -365,48 +487,19 @@ class RestauranteUI(tk.Tk):
 
                 id_prod = int(tree.item(sel)["values"][0])
 
-                # 1) Buscar IDs de menús ligados a esta producción
-                cursor.execute("SELECT IDMenuPlatos FROM MenuDePlatos WHERE IDProduccion = ?", (id_prod,))
-                ids_platos = [r[0] for r in cursor.fetchall()]
-
-                cursor.execute("SELECT IDMenuBebidas FROM MenuDeBebidas WHERE IDProduccion = ?", (id_prod,))
-                ids_bebidas = [r[0] for r in cursor.fetchall()]
-
-                # 2) Borrar detalles de ventas que apunten a esos menús
-                if ids_platos:
-                    q = f"DELETE FROM VentasClientesMenuBebidasMenuPlatos WHERE IDMenuPlatos IN ({','.join('?'*len(ids_platos))})"
-                    cursor.execute(q, ids_platos)
-
-                if ids_bebidas:
-                    q = f"DELETE FROM VentasClientesMenuBebidasMenuPlatos WHERE IDMenuBebidas IN ({','.join('?'*len(ids_bebidas))})"
-                    cursor.execute(q, ids_bebidas)
-
-                # 3) (opcional pero recomendable) borrar ventas huérfanas
-                cursor.execute("""
-                    DELETE FROM Venta
-                    WHERE NOT EXISTS (
-                        SELECT 1
-                        FROM VentasClientesMenuBebidasMenuPlatos d
-                        WHERE d.IDVentas = Venta.IDVentas
-                    )
-                """)
-
-                # 4) Borrar menús y producción
-                cursor.execute("DELETE FROM MenuDePlatos  WHERE IDProduccion = ?", (id_prod,))
-                cursor.execute("DELETE FROM MenuDeBebidas WHERE IDProduccion = ?", (id_prod,))
-                cursor.execute("DELETE FROM Produccion WHERE IDProduccion = ?", (id_prod,))
-
+                cursor.execute("DELETE FROM MenuDePlatos WHERE IDProduccion=?", (id_prod,))
+                cursor.execute("DELETE FROM MenuDeBebidas WHERE IDProduccion=?", (id_prod,))
+                cursor.execute("DELETE FROM Produccion WHERE IDProduccion=?", (id_prod,))
                 conexion.commit()
-                msg.showinfo("Éxito", "Registro eliminado correctamente.")
+
+                msg.showinfo("Éxito", "Registro eliminado.")
                 cargar_produccion()
 
             except Exception as e:
-                conexion.rollback()
                 msg.showerror("Error", f"No se pudo eliminar:\n{e}")
 
 
         def editar_produccion():
-            """Edita tipo, categoría, nombre y cantidad sin tocar costos."""
             try:
                 sel = tree.selection()
                 if not sel:
@@ -415,55 +508,56 @@ class RestauranteUI(tk.Tk):
 
                 vals = tree.item(sel)["values"]
                 id_prod = int(vals[0])
-                tipo = entries["Tipo de Producción"].get() or vals[1]
+
+                tipo = entries["Tipo de Producción"].get()
                 categoria = entries["Categoría"].get()
                 nombre = entries["Nombre"].get().strip()
-                cantidad_str = entries["Cantidad"].get().strip()
+                cantidad = int(entries["Cantidad"].get())
+                costo_unit = float(entries["Costo Unitario"].get())
+                costo_total = cantidad * costo_unit
 
-                if not categoria or not nombre or not cantidad_str:
-                    msg.showwarning("Atención", "Completa todos los campos.")
-                    return
-                if not cantidad_str.isdigit():
-                    msg.showwarning("Atención", "La cantidad debe ser numérica.")
-                    return
-
-                cantidad = int(cantidad_str)
-
-                cursor.execute("DELETE FROM MenuDePlatos WHERE IDProduccion = ?", (id_prod,))
-                cursor.execute("DELETE FROM MenuDeBebidas WHERE IDProduccion = ?", (id_prod,))
+                cursor.execute("DELETE FROM MenuDePlatos WHERE IDProduccion=?", (id_prod,))
+                cursor.execute("DELETE FROM MenuDeBebidas WHERE IDProduccion=?", (id_prod,))
 
                 if tipo == "Plato":
-                    cursor.execute("SELECT IDCategoriaPlatos FROM CategoriaPlatos WHERE NombreCategoria = ?", (categoria,))
+                    cursor.execute("SELECT IDCategoriaPlatos FROM CategoriaPlatos WHERE NombreCategoria=?", (categoria,))
                     id_cat = cursor.fetchone()[0]
+
                     cursor.execute("""
                         UPDATE Produccion
-                        SET CantidadDePlatos = ?, NombrePlato = ?, CantidadDeBebidas = NULL, NombreBebida = NULL
-                        WHERE IDProduccion = ?;
-                    """, (cantidad, nombre, id_prod))
+                        SET CantidadDePlatos=?, NombrePlato=?, CostoPorPlato=?, CostoProduccionTotal=?
+                        WHERE IDProduccion=?
+                    """, (cantidad, nombre, costo_unit, costo_total, id_prod))
+
                     cursor.execute("""
                         INSERT INTO MenuDePlatos (IDProduccion, IDCategoriaPlatos, NombrePlato, Precio)
-                        VALUES (?, ?, ?, 0);
-                    """, (id_prod, id_cat, nombre))
+                        VALUES (?, ?, ?, ?)
+                    """, (id_prod, id_cat, nombre, costo_unit))
+
                 else:
-                    cursor.execute("SELECT IDCategoriaBebidas FROM CategoriaBebidas WHERE NombreCategoria = ?", (categoria,))
+                    cursor.execute("SELECT IDCategoriaBebidas FROM CategoriaBebidas WHERE NombreCategoria=?", (categoria,))
                     id_cat = cursor.fetchone()[0]
+
                     cursor.execute("""
                         UPDATE Produccion
-                        SET CantidadDeBebidas = ?, NombreBebida = ?, CantidadDePlatos = NULL, NombrePlato = NULL
-                        WHERE IDProduccion = ?;
-                    """, (cantidad, nombre, id_prod))
+                        SET CantidadDeBebidas=?, NombreBebida=?, CostoPorBebida=?, CostoProduccionTotal=?
+                        WHERE IDProduccion=?
+                    """, (cantidad, nombre, costo_unit, costo_total, id_prod))
+
                     cursor.execute("""
                         INSERT INTO MenuDeBebidas (IDProduccion, IDCategoriaBebidas, NombreBebida, Precio)
-                        VALUES (?, ?, ?, 0);
-                    """, (id_prod, id_cat, nombre))
+                        VALUES (?, ?, ?, ?)
+                    """, (id_prod, id_cat, nombre, costo_unit))
 
                 conexion.commit()
-                msg.showinfo("Éxito", "Registro actualizado correctamente.")
+                msg.showinfo("Éxito", "Registro actualizado.")
                 cargar_produccion()
+
             except Exception as e:
                 msg.showerror("Error", f"No se pudo editar el registro:\n{e}")
 
-        # --- Asignar botones ---
+
+        # --- ASIGNAR BOTONES ---
         btn_agregar.config(command=agregar_produccion)
         btn_eliminar.config(command=eliminar_produccion)
         btn_editar.config(command=editar_produccion)
@@ -471,43 +565,64 @@ class RestauranteUI(tk.Tk):
         cargar_produccion()
 
 
+   
 
-    # ---------------- TAB INSUMOS ----------------
-    def _create_tab_insumos(self, notebook):
+    #----------------------------------------------------------------------------------TAB MENU DE PLATOS
+
+    def _create_tab_menu_platos(self, notebook):
         frame = ttk.Frame(notebook)
-        notebook.add(frame, text="Insumos")
+        notebook.add(frame, text="Menú de Platos")
 
-        self._create_tab_content(frame, "Registro de Insumos",
-                                 ["ID Producción", "Nombre", "Cantidades Disponibles",
-                                  "Cantidad Dañada", "Lácteos", "Carnes", "Vastimento"],
-                                 ["IDInsumos", "IDProducción", "Nombre", "Cantidades Disponibles",
-                                  "Cantidad Dañada", "Lácteos", "Carnes", "Vastimento"])
+        # Sección vacía hasta proximamente salga inspo
+        tk.Label(
+            frame,
+            text="Sección Menú de Platos (vacía por ahora)",
+            font=("Segoe UI", 12, "bold"),
+            bg="#F5F1E8"
+        ).pack(pady=20)
 
-
-    # ---------------- TAB PROVEEDORES ----------------
-    def _create_tab_proveedores(self, notebook):
+# ----------------------------------------------------------------------TAB MENU DE BEBIDAS
+    def _create_tab_menu_bebidas(self, notebook):
         frame = ttk.Frame(notebook)
-        notebook.add(frame, text="Proveedores")
+        notebook.add(frame, text="Menú de Bebidas")
 
-        self._create_tab_content(frame, "Gestión de Proveedores",
-                                 ["Nombre Proveedor", "Teléfono", "Precio de Compra", "Cantidad Comprada",
-                                  "Día", "Mes", "Año", "Hora", "ID Insumo"],
-                                 ["IDProveedor", "Nombre Proveedor", "Teléfono", "Precio de Compra",
-                                  "Cantidad Comprada", "Día", "Mes", "Año", "Hora", "IDInsumo"])
+        # Sección vacía hasta proximamente salga inspo
+        tk.Label(
+            frame,
+            text="Sección Menú de Bebidas (vacía por ahora)",
+            font=("Segoe UI", 12, "bold"),
+            bg="#F5F1E8"
+        ).pack(pady=20)
 
+        # -------------------------------------  TAB CLIENTES ----------------
 
-          # ---------------- TAB CLIENTES ----------------
     def _create_tab_clientes(self, notebook):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text="Clientes")
 
         # --- Crear contenido del tab (entradas, tabla y botones)
-        entries, tree, btn_agregar, btn_editar, btn_eliminar, btn_limpiar = self._create_tab_content(
-            frame, "Gestión de Clientes",
-            ["Número de Mesa", "Nombre1", "Nombre2",
-             "Apellido1", "Apellido2", "Teléfono"],
-            ["IDCliente", "Número de Mesa", "Nombre1", "Nombre2",
-             "Apellido1", "Apellido2", "Teléfono"]
+        entries, tree, btn_agregar, btn_editar, btn_eliminar, btn_limpiar = (
+            self._create_tab_content(
+                frame,
+                "Gestión de Clientes",
+                [
+                    "Número de Mesa",
+                    "Nombre1",
+                    "Nombre2",
+                    "Apellido1",
+                    "Apellido2",
+                    "Teléfono",
+                ],
+                [
+                    "IDCliente",
+                    "Número de Mesa",
+                    "Nombre1",
+                    "Nombre2",
+                    "Apellido1",
+                    "Apellido2",
+                    "Teléfono",
+                ],
+            )
         )
 
         # ---------- Conexión a la base de datos ----------
@@ -521,15 +636,21 @@ class RestauranteUI(tk.Tk):
             """Carga los clientes desde SQL Server en la tabla."""
             for fila in tree.get_children():
                 tree.delete(fila)
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT c.IDClientes, c.NumeroDeMesa, c.Nombre1, c.Nombre2, 
                        c.Apellido1, c.Apellido2, t.Telefono
                 FROM Clientes c
                 INNER JOIN TelefonoCliente t ON c.IDTelefonoClientes = t.IDTelefonoClientes
                 ORDER BY c.IDClientes
-            """)
+            """
+            )
             for row in cursor.fetchall():
-                tree.insert("", "end", values=["—" if x is None else str(x).strip() for x in row])
+                tree.insert(
+                    "",
+                    "end",
+                    values=["—" if x is None else str(x).strip() for x in row],
+                )
 
         def agregar_cliente():
             """Agrega un nuevo cliente con su teléfono."""
@@ -543,35 +664,48 @@ class RestauranteUI(tk.Tk):
 
                 # --- Validaciones básicas ---
                 if not mesa.isdigit():
-                    msg.showwarning("Atención", "El número de mesa debe ser un número entero.")
+                    msg.showwarning(
+                        "Atención", "El número de mesa debe ser un número entero."
+                    )
                     return
                 if not nombre1 or not apellido1:
-                    msg.showwarning("Atención", "Debe ingresar al menos el primer nombre y apellido.")
+                    msg.showwarning(
+                        "Atención",
+                        "Debe ingresar al menos el primer nombre y apellido.",
+                    )
                     return
                 if not telefono:
                     msg.showwarning("Atención", "Debe ingresar un número de teléfono.")
                     return
 
                 # --- Insertar teléfono y obtener su ID de forma segura ---
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO TelefonoCliente (Telefono)
                     OUTPUT INSERTED.IDTelefonoClientes
                     VALUES (?);
-                """, (telefono,))
+                """,
+                    (telefono,),
+                )
                 id_tel_row = cursor.fetchone()
                 conexion.commit()
 
                 if not id_tel_row or id_tel_row[0] is None:
-                    msg.showerror("Error", "No se pudo obtener el ID del teléfono insertado.")
+                    msg.showerror(
+                        "Error", "No se pudo obtener el ID del teléfono insertado."
+                    )
                     return
 
                 id_tel = int(id_tel_row[0])
 
                 # --- Insertar cliente ---
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO Clientes (NumeroDeMesa, IDTelefonoClientes, Nombre1, Nombre2, Apellido1, Apellido2)
                     VALUES (?, ?, ?, ?, ?, ?)
-                """, (int(mesa), id_tel, nombre1, nombre2, apellido1, apellido2))
+                """,
+                    (int(mesa), id_tel, nombre1, nombre2, apellido1, apellido2),
+                )
                 conexion.commit()
 
                 msg.showinfo("Éxito", "Cliente agregado correctamente.")
@@ -620,30 +754,41 @@ class RestauranteUI(tk.Tk):
                 telefono = entries["Teléfono"].get().strip()
 
                 if not mesa.isdigit():
-                    msg.showwarning("Atención", "El número de mesa debe ser un número entero.")
+                    msg.showwarning(
+                        "Atención", "El número de mesa debe ser un número entero."
+                    )
                     return
                 if not nombre1 or not apellido1:
-                    msg.showwarning("Atención", "Debe ingresar al menos el primer nombre y apellido.")
+                    msg.showwarning(
+                        "Atención",
+                        "Debe ingresar al menos el primer nombre y apellido.",
+                    )
                     return
                 if not telefono:
                     msg.showwarning("Atención", "Debe ingresar un número de teléfono.")
                     return
 
                 # Actualizar teléfono vinculado
-                cursor.execute("""
+                cursor.execute(
+                    """
                     UPDATE t
                     SET t.Telefono = ?
                     FROM TelefonoCliente t
                     INNER JOIN Clientes c ON c.IDTelefonoClientes = t.IDTelefonoClientes
                     WHERE c.IDClientes = ?
-                """, (telefono, id_cliente))
+                """,
+                    (telefono, id_cliente),
+                )
 
                 # Actualizar datos del cliente
-                cursor.execute("""
+                cursor.execute(
+                    """
                     UPDATE Clientes
                     SET NumeroDeMesa = ?, Nombre1 = ?, Nombre2 = ?, Apellido1 = ?, Apellido2 = ?
                     WHERE IDClientes = ?
-                """, (int(mesa), nombre1, nombre2, apellido1, apellido2, id_cliente))
+                """,
+                    (int(mesa), nombre1, nombre2, apellido1, apellido2, id_cliente),
+                )
                 conexion.commit()
 
                 msg.showinfo("Éxito", "Cliente actualizado correctamente.")
@@ -667,19 +812,42 @@ class RestauranteUI(tk.Tk):
         # ---------- Cargar datos al inicio ----------
         cargar_clientes()
 
-
-    # ---------------- TAB VENTAS ----------------
+    # ---------------- ---------------------------TAB VENTAS ----------------
     def _create_tab_ventas(self, notebook):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text="Ventas")
 
-        self._create_tab_content(frame, "Registro de Ventas",
-                                 ["Monto Total", "Pérdidas", "Ganancias",
-                                  "Hora", "Día", "Mes", "Año",
-                                  "ID Cliente", "ID Menú Bebidas", "ID Menú Platos", "Cantidad"],
-                                 ["IDVenta", "Monto Total", "Pérdidas", "Ganancias",
-                                  "Hora", "Día", "Mes", "Año",
-                                  "IDCliente", "IDMenuBebidas", "IDMenuPlatos", "Cantidad"])
+        self._create_tab_content(
+            frame,
+            "Registro de Ventas",
+            [
+                "Monto Total",
+                "Pérdidas",
+                "Ganancias",
+                "Hora",
+                "Día",
+                "Mes",
+                "Año",
+                "ID Cliente",
+                "ID Menú Bebidas",
+                "ID Menú Platos",
+                "Cantidad",
+            ],
+            [
+                "IDVenta",
+                "Monto Total",
+                "Pérdidas",
+                "Ganancias",
+                "Hora",
+                "Día",
+                "Mes",
+                "Año",
+                "IDCliente",
+                "IDMenuBebidas",
+                "IDMenuPlatos",
+                "Cantidad",
+            ],
+        )
 
 
 # ----------------------- MAIN ---------------------------------------------------
