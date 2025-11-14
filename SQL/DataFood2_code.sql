@@ -36,16 +36,31 @@ CREATE TABLE Proveedores (
     IDTelefonoProveedores INT NOT NULL REFERENCES TelefonoProveedores(IDTelefonoProveedores)
 );
 
+
 CREATE TABLE ProveedoresInsumos (
     IDProveedoresInsumos INT PRIMARY KEY IDENTITY(1,1),
-    IDInsumos INT NOT NULL REFERENCES Insumos(IDInsumos),
-    IDProveedor INT NOT NULL REFERENCES Proveedores(IDProveedor),
+    IDInsumos INT NULL,
+    IDProveedor INT NOT NULL,
     PrecioCompra DECIMAL(10,2),
     CantidadComprada INT,
     Dia INT,
     Mes INT,
     Ano INT
 );
+
+-- Foreign Key hacia Insumos con SET NULL si se elimina un insumo
+ALTER TABLE ProveedoresInsumos
+ADD CONSTRAINT FK_ProveedoresInsumos_Insumos
+FOREIGN KEY (IDInsumos)
+REFERENCES Insumos(IDInsumos)
+ON DELETE SET NULL;
+
+-- Foreign Key hacia Proveedores (normal)
+ALTER TABLE ProveedoresInsumos
+ADD CONSTRAINT FK_ProveedoresInsumos_Proveedores
+FOREIGN KEY (IDProveedor)
+REFERENCES Proveedores(IDProveedor);
+
 
 CREATE TABLE TelefonoCliente (
     IDTelefonoClientes INT PRIMARY KEY IDENTITY(1,1),
