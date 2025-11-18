@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from datetime import datetime
 from tkinter import messagebox as msg   # <--- NUEVO
 import pyodbc                           # <--- NUEVO
 
@@ -30,44 +31,38 @@ class RestauranteUI(tk.Tk):
         # --------------- Estilo ------------------
         self._apply_style()
 
-        # Estado inicial del sidebar (visible)
-        self.sidebar_visible = True
-
         # --------------- Encabezado ------------------
         header = tk.Frame(self, bg="#C8B88A", height=50)
         header.pack(side="top", fill="x")
 
-        # Para poder centrar el título y tener la flecha a la izquierda
-        header.grid_columnconfigure(1, weight=1)
-
-        # 🔽 Botón flecha para ocultar/mostrar el panel principal
-        self.btn_toggle_sidebar = tk.Button(
+        # Título a la izquierda
+        self.header_title = tk.Label(
             header,
-            text="⮜",  # flecha apuntando al sidebar
-            bg="#C8B88A",
-            fg="#ffffff",
-            bd=0,
-            font=("Segoe UI", 12, "bold"),
-            activebackground="#C8B88A",
-            activeforeground="#ffffff",
-            command=self._toggle_sidebar
-        )
-        self.btn_toggle_sidebar.grid(row=0, column=0, padx=(8, 5), pady=5)
-
-        # Título centrado
-        tk.Label(
-            header,
-            text="DataFood  |  Sistema de Gestión de Restaurante",
+            text="  DataFood  |  Sistema de Gestión de Restaurante",
             bg="#C8B88A",
             fg="#ffffff",
             font=("Segoe UI", 15, "bold")
-        ).grid(row=0, column=1, pady=5)
+        )
+        self.header_title.pack(side="left", pady=5, padx=10)
+
+        # ⏰ Hora a la derecha
+        self.time_label = tk.Label(
+            header,
+            text="",
+            bg="#C8B88A",
+            fg="#ffffff",
+            font=("Segoe UI", 11, "bold")
+        )
+        self.time_label.pack(side="right", pady=5, padx=15)
+
+        # Iniciar actualización de la hora
+        self._actualizar_hora()
 
         # --------------- CONTENEDOR PRINCIPAL (3 COLUMNAS) ------------------
         main_content = tk.Frame(self, bg="#F5F1E8")
         main_content.pack(expand=True, fill="both", padx=10, pady=10)
 
-        # ------------------ COLUMNA IZQUIERDA (PANEL PRINCIPAL) -------------
+        # ------------------ COLUMNA IZQUIERDA (GESTIÓN) ---------------------
         self.sidebar = tk.Frame(main_content, bg="#C8B88A", width=230)
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
@@ -104,13 +99,13 @@ class RestauranteUI(tk.Tk):
         )
         inicio_btn.pack(fill="x", padx=15, pady=(5, 5))
 
-        # Botón de Gestión → ahora cambia el centro (no abre ventana nueva)
+        # Botón de Gestión
         gestion_btn = ttk.Button(
             self.sidebar,
             text="Gestión",
             command=self._abrir_ventana_gestion
         )
-        gestion_btn.pack(fill="x", padx=15, pady=(5, 5))
+        gestion_btn.pack(fill="x", padx=15, pady=(10, 5))
 
         ttk.Button(self.sidebar, text="Pedidos (próximamente)").pack(
             fill="x", padx=15, pady=5
@@ -127,12 +122,12 @@ class RestauranteUI(tk.Tk):
         self._mostrar_dashboard_inicial()
 
         # ------------------ COLUMNA DERECHA (ESPACIO FUTURO) ----------------
-        self.right_frame = tk.Frame(main_content, bg="#F5F1E8", width=260)
-        self.right_frame.pack(side="left", fill="y")
-        self.right_frame.pack_propagate(False)
+        self.right_panel = tk.Frame(main_content, bg="#F5F1E8", width=260)
+        self.right_panel.pack(side="left", fill="y")
+        self.right_panel.pack_propagate(False)
 
         tk.Label(
-            self.right_frame,
+            self.right_panel,
             text="Panel derecho\n(próximas funciones)",
             bg="#F5F1E8",
             fg="#444444",
@@ -141,8 +136,8 @@ class RestauranteUI(tk.Tk):
         ).pack(padx=10, pady=20)
 
         tk.Label(
-            self.right_frame,
-            text="Aquí puedes añadir más adelante:\n"
+            self.right_panel,
+            text="no se que poner pero algo voy a poner\n"
                  "- Detalle del pedido actual\n"
                  "- Resumen de venta\n"
                  "- Métodos de pago, etc.",
@@ -152,6 +147,23 @@ class RestauranteUI(tk.Tk):
             justify="left"
         ).pack(padx=10, pady=5)
 
+        # estado del panel lateral (para la flecha de los CRUD)
+        self.sidebar_visible = True
+
+    # ------------------------------------------------------------------
+    # ⏰ HORA EN EL ENCABEZADO
+    # ------------------------------------------------------------------
+
+    def _actualizar_hora(self):
+        """Actualiza la hora en el encabezado cada segundo."""
+        # %I → hora en formato 12h, %p → AM/PM
+        ahora = datetime.now().strftime("%I:%M:%S %p")
+        self.time_label.config(text=ahora)
+        self.after(1000, self._actualizar_hora)
+
+    # ------------------------------------------------------------------
+    # PÁGINA DE INICIO (MENÚ DE PLATOS Y BEBIDAS)
+    # ------------------------------------------------------------------
     def _mostrar_dashboard_inicial(self):
         """Contenido central por defecto: Menú de Platos y Bebidas."""
         # limpiar todo lo que haya en el centro
@@ -168,7 +180,7 @@ class RestauranteUI(tk.Tk):
 
         tk.Label(
             self.center_frame,
-            text="Aquí irán las tarjetas/fotos de los platos y bebidas.\n"
+            text="aqui vas a poner los cruds de los menus\n"
                  "Esta zona corresponde a donde ves las imágenes de comida en la referencia.",
             bg="#FFFFFF",
             fg="#666666",
@@ -190,7 +202,7 @@ class RestauranteUI(tk.Tk):
 
         tk.Label(
             frame_platos,
-            text="(Aquí puedes colocar una cuadrícula de platos con foto, nombre y precio.)",
+            text="(Aquí el menu plato )",
             bg="#FFFFFF",
             fg="#666666",
             font=("Segoe UI", 9)
@@ -207,55 +219,103 @@ class RestauranteUI(tk.Tk):
 
         tk.Label(
             frame_bebidas,
-            text="(Aquí puedes colocar una cuadrícula de bebidas con foto, nombre y precio.)",
+            text="(Aquí poner  una cuadrícula de bebidas con foto, nombre y precio.)",
             bg="#FFFFFF",
             fg="#666666",
             font=("Segoe UI", 9)
         ).pack(anchor="w", padx=10, pady=5)
 
+    # ------------------------------------------------------------------
+    # VENTANA DE GESTIÓN (CRUDs) + FLECHA PARA OCULTAR PANEL LATERAL
+    # ------------------------------------------------------------------
     def _abrir_ventana_gestion(self):
         """Muestra el notebook de CRUDs dentro del centro (misma ventana)."""
         # limpiar contenido central
         for widget in self.center_frame.winfo_children():
             widget.destroy()
 
-        # contenedor para el título + notebook
-        container = tk.Frame(self.center_frame, bg="#F5F1E8")
+        # contenedor para todo el CRUD, fondo blanco para evitar línea blanca
+        container = tk.Frame(self.center_frame, bg="#FFFFFF")
         container.pack(fill="both", expand=True)
 
+        # barra superior con flecha + título
+        top_bar = tk.Frame(container, bg="#FFFFFF")
+        top_bar.pack(fill="x", pady=(10, 5))
+
+        # guardamos la flecha en self.arrow_btn para poder cambiar el símbolo
+        self.arrow_btn = tk.Button(
+            top_bar,
+            text="◀",              # triangulito hacia la izquierda
+            bg="#FFFFFF",
+            bd=0,
+            font=("Segoe UI", 12, "bold"),
+            command=self._toggle_sidebar
+        )
+        self.arrow_btn.pack(side="left", padx=(5, 5))
+
         tk.Label(
-            container,
+            top_bar,
             text="Gestión de Datos  |  CRUD DataFood",
-            bg="#F5F1E8",
+            bg="#FFFFFF",
             fg="#333333",
             font=("Segoe UI", 14, "bold")
-        ).pack(anchor="w", padx=15, pady=(10, 5))
+        ).pack(side="left", padx=5)
 
+        # Notebook de CRUDs
         notebook = ttk.Notebook(container)
         notebook.pack(expand=True, fill="both", padx=10, pady=10)
 
+        # pestañas CRUD
         self._create_tab_proveedores(notebook)
         self._create_tab_insumos(notebook)
         self._create_tab_produccion(notebook)
         self._create_tab_clientes(notebook)
         self._create_tab_ventas(notebook)
 
+        # aseguramos el estado inicial
+        self.sidebar_visible = True
+
+    # ------------------------------------------------------------------
+    # TOGGLE DEL PANEL LATERAL (USADO SOLO POR LA FLECHA EN CRUDs)
+    # ------------------------------------------------------------------
+      
     def _toggle_sidebar(self):
-        """Oculta o muestra el panel principal y expande/contrae el CRUD."""
+        """Oculta o muestra el panel lateral cuando se pulsa la flecha."""
         if self.sidebar_visible:
-            # Ocultar panel izquierdo y derecho para que el CRUD use todo el ancho
+            # ocultar panel izquierdo y derecho → expandir CRUD
             self.sidebar.pack_forget()
-            self.right_frame.pack_forget()
-            self.btn_toggle_sidebar.config(text="⮞")  # flecha hacia la derecha (expandir)
+            self.right_panel.pack_forget()
+
+            # reempacamos el centro para asegurarnos que ocupa todo
+            self.center_frame.pack_forget()
+            self.center_frame.pack(
+                side="left", fill="both", expand=True, padx=10, pady=5
+            )
+
             self.sidebar_visible = False
+
+            # cambiar flecha a triangulo hacia la derecha
+            if hasattr(self, "arrow_btn"):
+                self.arrow_btn.config(text="▶")
+
         else:
-            # Volver a mostrar ambos paneles
+            # volver a mostrar paneles → CRUD vuelve a compactarse
+            self.center_frame.pack_forget()
+
+            # orden correcto: sidebar | center_frame | right_panel
             self.sidebar.pack(side="left", fill="y")
-            self.right_frame.pack(side="left", fill="y")
-            self.btn_toggle_sidebar.config(text="⮜")  # flecha hacia el panel
+            self.center_frame.pack(
+                side="left", fill="both", expand=True, padx=10, pady=5
+            )
+            self.right_panel.pack(side="left", fill="y")
+
             self.sidebar_visible = True
 
-      
+            # flecha vuelve a apuntar a la izquierda
+            if hasattr(self, "arrow_btn"):
+                self.arrow_btn.config(text="◀")
+
+
     # ------------------------- UI --------------------------------
 
     def _apply_style(self):
