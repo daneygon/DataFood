@@ -181,33 +181,154 @@ class RestauranteUI(tk.Tk):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text="Proveedores")
 
-        self._create_tab_content(
+        # Crear seccion con los widgets
+        entries, tree, btn_agregar, btn_editar, btn_eliminar, btn_limpiar = self._create_tab_content(
             frame,
             "Gestión de Proveedores",
-            [
-                "Nombre Proveedor",
-                "Teléfono",
-                "Precio de Compra",
-                "Cantidad Comprada",
-                "Día",
-                "Mes",
-                "Año",
-                "Hora",
-                "ID Insumo",
-            ],
-            [
-                "IDProveedor",
-                "Nombre Proveedor",
-                "Teléfono",
-                "Precio de Compra",
-                "Cantidad Comprada",
-                "Día",
-                "Mes",
-                "Año",
-                "Hora",
-                "IDInsumo",
-            ],
+            ["Nombre Proveedor", "Teléfono"],
+            ["IDProveedor", "Nombre Proveedor", "Teléfono"]
         )
+
+        conexion = conectar()
+        cursor = conexion.cursor()
+
+        # --------------- FUNCIONES INTERNAS -------------------
+
+        def limpiar_valor(v):
+            """Limpia '(1,' 'lol',' etc."""
+            if v is None:
+                return ""
+            v = str(v)
+            return v.replace("(", "").replace(")", "").replace(",", "").replace("'", "").strip()
+
+        # ------------------ Cargar Proveedores ------------------
+        def cargar_proveedores():
+            for fila in tree.get_children():
+                tree.delete(fila)
+
+            cursor.execute("""
+                SELECT P.IDProveedor,
+                    P.NombreProveedor,
+                    T.Telefono
+                FROM Proveedores P
+                INNER JOIN TelefonoProveedores T
+                        ON P.IDTelefonoProveedores = T.IDTelefonoProveedores
+                ORDER BY P.IDProveedor
+            """)
+
+            for row in cursor.fetchall():
+                limpio = [limpiar_valor(x) for x in row]
+                tree.insert("", "end", values=limpio)
+
+        # ------------------ Agregar Proveedor ------------------
+        def agregar_proveedor():
+            try:
+                nombre = entries["Nombre Proveedor"].get().strip()
+                telefono = entries["Teléfono"].get().strip()
+
+                if not nombre:
+                    msg.showwarning("Atención", "Debe ingresar el nombre del proveedor.")
+                    return
+                if not telefono:
+                    msg.showwarning("Atención", "Debe ingresar un número de teléfono.")
+                    return
+
+                # Insertar teléfono y obtener ID
+                cursor.execute("""
+                    INSERT INTO TelefonoProveedores (Telefono)
+                    OUTPUT INSERTED.IDTelefonoProveedores
+                    VALUES (?);
+                """, (telefono,))
+                id_tel = cursor.fetchone()[0]
+
+                # Insertar proveedor
+                cursor.execute("""
+                    INSERT INTO Proveedores (NombreProveedor, IDTelefonoProveedores)
+                    VALUES (?, ?)
+                """, (nombre, id_tel))
+
+                conexion.commit()
+                msg.showinfo("Éxito", "Proveedor agregado correctamente.")
+                cargar_proveedores()
+                limpiar()
+            except Exception as e:
+                msg.showerror("Error", f"No se pudo agregar:\n{e}")
+
+        # ------------------ Eliminar Proveedor ------------------
+        def eliminar_proveedor():
+            try:
+                sel = tree.selection()
+                if not sel:
+                    msg.showwarning("Atención", "Seleccione un proveedor para eliminar.")
+                    return
+
+                vals = tree.item(sel)["values"]
+                id_prov = int(limpiar_valor(vals[0]))
+
+                cursor.execute("SELECT IDTelefonoProveedores FROM Proveedores WHERE IDProveedor = ?", id_prov)
+                id_tel = cursor.fetchone()[0]
+
+                cursor.execute("DELETE FROM Proveedores WHERE IDProveedor = ?", id_prov)
+                cursor.execute("DELETE FROM TelefonoProveedores WHERE IDTelefonoProveedores = ?", id_tel)
+
+                conexion.commit()
+                msg.showinfo("Éxito", "Proveedor eliminado correctamente.")
+                cargar_proveedores()
+
+            except Exception as e:
+                msg.showerror("Error", f"No se pudo eliminar:\n{e}")
+
+        # ------------------ Editar Proveedor ------------------
+        def editar_proveedor():
+            try:
+                sel = tree.selection()
+                if not sel:
+                    msg.showwarning("Atención", "Seleccione un proveedor para editar.")
+                    return
+
+                vals = tree.item(sel)["values"]
+                id_prov = int(limpiar_valor(vals[0]))
+
+                nombre = entries["Nombre Proveedor"].get().strip()
+                telefono = entries["Teléfono"].get().strip()
+
+                cursor.execute("SELECT IDTelefonoProveedores FROM Proveedores WHERE IDProveedor = ?", id_prov)
+                id_tel = cursor.fetchone()[0]
+
+                cursor.execute("""
+                    UPDATE Proveedores
+                    SET NombreProveedor = ?
+                    WHERE IDProveedor = ?
+                """, (nombre, id_prov))
+
+                cursor.execute("""
+                    UPDATE TelefonoProveedores
+                    SET Telefono = ?
+                    WHERE IDTelefonoProveedores = ?
+                """, (telefono, id_tel))
+
+                conexion.commit()
+                msg.showinfo("Éxito", "Proveedor actualizado correctamente.")
+                cargar_proveedores()
+
+            except Exception as e:
+                msg.showerror("Error", f"No se pudo editar:\n{e}")
+
+        # ------------------ Limpiar campos ------------------
+        def limpiar():
+            for e in entries.values():
+                e.delete(0, tk.END)
+
+        # ------------------ Asignar botones ------------------
+        btn_agregar.config(command=agregar_proveedor)
+        btn_eliminar.config(command=eliminar_proveedor)
+        btn_editar.config(command=editar_proveedor)
+        btn_limpiar.config(command=limpiar)
+
+        cargar_proveedores()
+
+
+
 
      # ---------------- ------------------------------------------------------------------TAB INSUMOS ----------------
     def _create_tab_insumos(self, notebook):
@@ -224,7 +345,7 @@ class RestauranteUI(tk.Tk):
         left = tk.Frame(main_frame, bg="#E9E2D0", padx=15, pady=15)
         left.pack(side="left", fill="y")
 
-        tk.Label(left, text="📦 CRUD de Insumos", bg="#E9E2D0",
+        tk.Label(left, text="📦 Insumos", bg="#E9E2D0",
                 font=("Segoe UI", 12, "bold"), fg="#6A4E23").pack(pady=(0, 10))
 
         # Campos
