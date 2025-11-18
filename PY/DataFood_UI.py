@@ -9,7 +9,10 @@ from tkinter import ttk
 class RestauranteUI(tk.Tk):
     def __init__(self):
         super().__init__()
+    
 
+
+    
         # ---------- Ventana principal ---------------
         self.title("Sistema de Gestión de Restaurante - DataFood")
         self.geometry("1200x700")
@@ -32,6 +35,8 @@ class RestauranteUI(tk.Tk):
         # -------- Notebook (Tabs)
         notebook = ttk.Notebook(self)
         notebook.pack(expand=True, fill="both", padx=10, pady=10)
+    
+
 
         self._create_tab_proveedores(notebook)
         self._create_tab_insumos(notebook)
@@ -40,8 +45,9 @@ class RestauranteUI(tk.Tk):
         self._create_tab_menu_bebidas(notebook)
         self._create_tab_clientes(notebook)
         self._create_tab_ventas(notebook)
-   
-
+        
+       
+      
     # ------------------------- UI --------------------------------
 
     def _apply_style(self):
@@ -176,12 +182,41 @@ class RestauranteUI(tk.Tk):
         tree = self._create_treeview(right, tree_columns)
         return entries, tree
     
+
+            # -------------------------------------------------------------
+    # FUNCIÓN GLOBAL – ACTUALIZA LISTA DE PROVEEDORES EN INSUMOS
+    # -------------------------------------------------------------
+    def cargar_proveedores_global(self):
+        """Carga la lista de proveedores en el combobox de Insumos."""
+        try:
+            conexion = conectar()
+            cursor = conexion.cursor()
+
+            cursor.execute("""
+                SELECT IDProveedor, NombreProveedor
+                FROM Proveedores
+                ORDER BY NombreProveedor
+            """)
+
+            proveedores = cursor.fetchall()
+
+            # Guardar la lista dentro del objeto
+            self.lista_proveedores = proveedores
+
+            # Si existe combobox en insumos, actualizarlo:
+            if hasattr(self, "combo_proveedores_insumos"):
+                self.combo_proveedores_insumos["values"] = [p[1] for p in proveedores]
+
+        except Exception as e:
+            print("Error cargando proveedores global:", e)
+
     # ---------------- ------------------------------------------------------------------------TAB PROVEEDORES ----------------
+    # ---------------- TAB PROVEEDORES ----------------
     def _create_tab_proveedores(self, notebook):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text="Proveedores")
 
-        # Crear seccion con los widgets
+        # Crear sección con widgets
         entries, tree, btn_agregar, btn_editar, btn_eliminar, btn_limpiar = self._create_tab_content(
             frame,
             "Gestión de Proveedores",
@@ -192,27 +227,30 @@ class RestauranteUI(tk.Tk):
         conexion = conectar()
         cursor = conexion.cursor()
 
-        # --------------- FUNCIONES INTERNAS -------------------
-
+        # -------------------------------------------------
+        # Función para limpiar valores raros (', ) etc.
+        # -------------------------------------------------
         def limpiar_valor(v):
-            """Limpia '(1,' 'lol',' etc."""
             if v is None:
                 return ""
             v = str(v)
             return v.replace("(", "").replace(")", "").replace(",", "").replace("'", "").strip()
 
-        # ------------------ Cargar Proveedores ------------------
+        # -------------------------------------------------
+        # CARGAR PROVEEDORES EN EL TREEVIEW
+        # -------------------------------------------------
         def cargar_proveedores():
             for fila in tree.get_children():
                 tree.delete(fila)
 
             cursor.execute("""
-                SELECT P.IDProveedor,
+                SELECT 
+                    P.IDProveedor,
                     P.NombreProveedor,
                     T.Telefono
                 FROM Proveedores P
                 INNER JOIN TelefonoProveedores T
-                        ON P.IDTelefonoProveedores = T.IDTelefonoProveedores
+                    ON P.IDTelefonoProveedores = T.IDTelefonoProveedores
                 ORDER BY P.IDProveedor
             """)
 
@@ -220,20 +258,23 @@ class RestauranteUI(tk.Tk):
                 limpio = [limpiar_valor(x) for x in row]
                 tree.insert("", "end", values=limpio)
 
-        # ------------------ Agregar Proveedor ------------------
+            # 🔥 ACTUALIZA COMBOBOX GLOBAL
+            self.cargar_proveedores_global()
+
+        # -------------------------------------------------
+        # AGREGAR PROVEEDOR
+        # -------------------------------------------------
         def agregar_proveedor():
             try:
                 nombre = entries["Nombre Proveedor"].get().strip()
                 telefono = entries["Teléfono"].get().strip()
 
                 if not nombre:
-                    msg.showwarning("Atención", "Debe ingresar el nombre del proveedor.")
-                    return
+                    return msg.showwarning("Atención", "Debe ingresar el nombre del proveedor.")
                 if not telefono:
-                    msg.showwarning("Atención", "Debe ingresar un número de teléfono.")
-                    return
+                    return msg.showwarning("Atención", "Debe ingresar un número de teléfono.")
 
-                # Insertar teléfono y obtener ID
+                # Insertar teléfono → obtener ID
                 cursor.execute("""
                     INSERT INTO TelefonoProveedores (Telefono)
                     OUTPUT INSERTED.IDTelefonoProveedores
@@ -249,77 +290,101 @@ class RestauranteUI(tk.Tk):
 
                 conexion.commit()
                 msg.showinfo("Éxito", "Proveedor agregado correctamente.")
+
                 cargar_proveedores()
                 limpiar()
+
             except Exception as e:
                 msg.showerror("Error", f"No se pudo agregar:\n{e}")
 
-        # ------------------ Eliminar Proveedor ------------------
+        # -------------------------------------------------
+        # ELIMINAR PROVEEDOR
+        # -------------------------------------------------
         def eliminar_proveedor():
             try:
                 sel = tree.selection()
                 if not sel:
-                    msg.showwarning("Atención", "Seleccione un proveedor para eliminar.")
-                    return
+                    return msg.showwarning("Atención", "Seleccione un proveedor para eliminar.")
 
-                vals = tree.item(sel)["values"]
-                id_prov = int(limpiar_valor(vals[0]))
+                fila = tree.item(sel)["values"]
+                id_prov = int(limpiar_valor(fila[0]))
 
-                cursor.execute("SELECT IDTelefonoProveedores FROM Proveedores WHERE IDProveedor = ?", id_prov)
+                # Obtener IDTel antes de eliminar
+                cursor.execute("SELECT IDTelefonoProveedores FROM Proveedores WHERE IDProveedor=?", (id_prov,))
                 id_tel = cursor.fetchone()[0]
 
-                cursor.execute("DELETE FROM Proveedores WHERE IDProveedor = ?", id_prov)
-                cursor.execute("DELETE FROM TelefonoProveedores WHERE IDTelefonoProveedores = ?", id_tel)
+                # Borrar proveedor
+                cursor.execute("DELETE FROM Proveedores WHERE IDProveedor=?", (id_prov,))
+                cursor.execute("DELETE FROM TelefonoProveedores WHERE IDTelefonoProveedores=?", (id_tel,))
 
                 conexion.commit()
                 msg.showinfo("Éxito", "Proveedor eliminado correctamente.")
+
                 cargar_proveedores()
 
             except Exception as e:
                 msg.showerror("Error", f"No se pudo eliminar:\n{e}")
 
-        # ------------------ Editar Proveedor ------------------
+        # -------------------------------------------------
+        # EDITAR PROVEEDOR
+        # -------------------------------------------------
         def editar_proveedor():
             try:
                 sel = tree.selection()
                 if not sel:
-                    msg.showwarning("Atención", "Seleccione un proveedor para editar.")
-                    return
+                    return msg.showwarning("Atención", "Seleccione un proveedor para editar.")
 
-                vals = tree.item(sel)["values"]
-                id_prov = int(limpiar_valor(vals[0]))
+                fila = tree.item(sel)["values"]
+                id_prov = int(limpiar_valor(fila[0]))
 
                 nombre = entries["Nombre Proveedor"].get().strip()
                 telefono = entries["Teléfono"].get().strip()
 
-                cursor.execute("SELECT IDTelefonoProveedores FROM Proveedores WHERE IDProveedor = ?", id_prov)
+                if not nombre:
+                    return msg.showwarning("Atención", "El proveedor debe tener nombre.")
+                if not telefono:
+                    return msg.showwarning("Atención", "Debe ingresar un teléfono.")
+
+                # Obtener ID teléfono
+                cursor.execute("""
+                    SELECT IDTelefonoProveedores 
+                    FROM Proveedores
+                    WHERE IDProveedor=?
+                """, (id_prov,))
                 id_tel = cursor.fetchone()[0]
 
+                # Actualizar proveedor
                 cursor.execute("""
                     UPDATE Proveedores
-                    SET NombreProveedor = ?
-                    WHERE IDProveedor = ?
+                    SET NombreProveedor=?
+                    WHERE IDProveedor=?
                 """, (nombre, id_prov))
 
+                # Actualizar teléfono
                 cursor.execute("""
                     UPDATE TelefonoProveedores
-                    SET Telefono = ?
-                    WHERE IDTelefonoProveedores = ?
+                    SET Telefono=?
+                    WHERE IDTelefonoProveedores=?
                 """, (telefono, id_tel))
 
                 conexion.commit()
                 msg.showinfo("Éxito", "Proveedor actualizado correctamente.")
+
                 cargar_proveedores()
 
             except Exception as e:
                 msg.showerror("Error", f"No se pudo editar:\n{e}")
 
-        # ------------------ Limpiar campos ------------------
+        # -------------------------------------------------
+        # LIMPIAR CAMPOS
+        # -------------------------------------------------
         def limpiar():
             for e in entries.values():
                 e.delete(0, tk.END)
 
-        # ------------------ Asignar botones ------------------
+        # -------------------------------------------------
+        # ASIGNAR BOTONES
+        # -------------------------------------------------
         btn_agregar.config(command=agregar_proveedor)
         btn_eliminar.config(command=eliminar_proveedor)
         btn_editar.config(command=editar_proveedor)
@@ -329,8 +394,8 @@ class RestauranteUI(tk.Tk):
 
 
 
-
      # ---------------- ------------------------------------------------------------------TAB INSUMOS ----------------
+     
     def _create_tab_insumos(self, notebook):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text="Insumos")
@@ -341,70 +406,137 @@ class RestauranteUI(tk.Tk):
         main_frame = tk.Frame(frame, bg="#F5F1E8")
         main_frame.pack(fill="both", expand=True)
 
-        # Panel izquierdo
-        left = tk.Frame(main_frame, bg="#E9E2D0", padx=15, pady=15)
-        left.pack(side="left", fill="y")
+        # =========== PANEL IZQUIERDO CON SCROLL ===========
+        left_container = tk.Frame(main_frame, bg="#E9E2D0")
+        left_container.pack(side="left", fill="y")
 
-        tk.Label(left, text="📦 Insumos", bg="#E9E2D0",
-                font=("Segoe UI", 12, "bold"), fg="#6A4E23").pack(pady=(0, 10))
+        canvas = tk.Canvas(left_container, bg="#E9E2D0", highlightthickness=0)
+        canvas.pack(side="left", fill="y", expand=False)
 
-        # Campos
+        scrollbar_left = ttk.Scrollbar(left_container, orient="vertical", command=canvas.yview)
+        scrollbar_left.pack(side="right", fill="y")
+
+        canvas.configure(yscrollcommand=scrollbar_left.set)
+
+        left = tk.Frame(canvas, bg="#E9E2D0", padx=15, pady=15)
+        canvas.create_window((0, 0), window=left, anchor="nw")
+
+        def update_scroll(_):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        left.bind("<Configure>", update_scroll)
+
+        # =========== TITULO ===========
+        tk.Label(left, text="📦 Gestión de Insumos", bg="#E9E2D0",
+                font=("Segoe UI", 12, "bold"), fg="#6A4E23").pack(pady=(0,10))
+
         entries = {}
 
-        # ---- CATEGORÍA (Combobox normal)
-        tk.Label(left, text="Categoría:", bg="#E9E2D0", font=("Segoe UI", 10)).pack(anchor="w")
+        # ============================================================
+        # 1️⃣ CATEGORÍA
+        # ============================================================
+        tk.Label(left, text="Categoría:", bg="#E9E2D0").pack(anchor="w")
         combo_categoria = ttk.Combobox(left, state="readonly")
-        combo_categoria.pack(fill="x", pady=2)
+        combo_categoria.pack(fill="x", pady=3)
         entries["Categoría"] = combo_categoria
 
         cursor.execute("SELECT NombreCategoria FROM CategoriaInsumos ORDER BY NombreCategoria")
-        categorias = [row[0] for row in cursor.fetchall()]
-        combo_categoria["values"] = categorias
+        combo_categoria["values"] = [row[0] for row in cursor.fetchall()]
 
-        # ---- Nombre
-        tk.Label(left, text="Nombre:", bg="#E9E2D0", font=("Segoe UI", 10)).pack(anchor="w")
-        entry = ttk.Entry(left)
-        entry.pack(fill="x", pady=2)
-        entries["Nombre"] = entry
+        # ============================================================
+        # 2️⃣ NOMBRE INSUMO
+        # ============================================================
+        tk.Label(left, text="Nombre del Insumo:", bg="#E9E2D0").pack(anchor="w")
+        e = ttk.Entry(left)
+        e.pack(fill="x", pady=3)
+        entries["Nombre"] = e
 
-        # ---- Cantidad Disponible
-        tk.Label(left, text="Cantidad Disponible:", bg="#E9E2D0", font=("Segoe UI", 10)).pack(anchor="w")
-        entry = ttk.Entry(left)
-        entry.pack(fill="x", pady=2)
-        entries["Cantidad Disponible"] = entry
+        # ============================================================
+        # 3️⃣ CANTIDADES
+        # ============================================================
+        tk.Label(left, text="Cantidad Disponible:", bg="#E9E2D0").pack(anchor="w")
+        entries["Disponible"] = ttk.Entry(left)
+        entries["Disponible"].pack(fill="x", pady=3)
 
-        # ---- Cantidad Dañada
-        tk.Label(left, text="Cantidad Dañada (opcional):", bg="#E9E2D0", font=("Segoe UI", 10)).pack(anchor="w")
-        entry = ttk.Entry(left)
-        entry.pack(fill="x", pady=2)
-        entries["Cantidad Dañada"] = entry
+        tk.Label(left, text="Cantidad Dañada:", bg="#E9E2D0").pack(anchor="w")
+        entries["Dañada"] = ttk.Entry(left)
+        entries["Dañada"].pack(fill="x", pady=3)
 
-        # ---- BOTONES
+        # ============================================================
+        # 4️⃣ PROVEEDOR (DINÁMICO)
+        # ============================================================
+        tk.Label(left, text="Proveedor:", bg="#E9E2D0").pack(anchor="w")
+        self.combo_proveedores_insumos = ttk.Combobox(left, state="readonly")
+        self.combo_proveedores_insumos.pack(fill="x", pady=3)
+        entries["Proveedor"] = self.combo_proveedores_insumos
+
+        self.cargar_proveedores_global()
+        self.combo_proveedores_insumos["values"] = [p[1] for p in self.lista_proveedores]
+
+        # ============================================================
+        # 5️⃣ PRECIO COMPRA
+        # ============================================================
+        tk.Label(left, text="Precio Compra:", bg="#E9E2D0").pack(anchor="w")
+        entries["Precio"] = ttk.Entry(left)
+        entries["Precio"].pack(fill="x", pady=3)
+
+        # ============================================================
+        # 6️⃣ CANTIDAD COMPRADA
+        # ============================================================
+        tk.Label(left, text="Cantidad Comprada:", bg="#E9E2D0").pack(anchor="w")
+        entries["Comprada"] = ttk.Entry(left)
+        entries["Comprada"].pack(fill="x", pady=3)
+
+        # ============================================================
+        # 7️⃣ FECHA
+        # ============================================================
+        tk.Label(left, text="Fecha de Ingreso (DD/MM/AAAA):", bg="#E9E2D0").pack(anchor="w")
+        entries["Fecha"] = ttk.Entry(left)
+        entries["Fecha"].pack(fill="x", pady=3)
+
+        # ============================================================
+        # BOTONES
+        # ============================================================
         btn_frame = tk.Frame(left, bg="#E9E2D0")
         btn_frame.pack(pady=10, fill="x")
 
         btn_agregar = ttk.Button(btn_frame, text="Agregar")
-        btn_agregar.pack(fill="x", pady=2)
-        btn_editar = ttk.Button(btn_frame, text="Editar")
-        btn_editar.pack(fill="x", pady=2)
-        btn_eliminar = ttk.Button(btn_frame, text="Eliminar")
-        btn_eliminar.pack(fill="x", pady=2)
-        btn_limpiar = ttk.Button(btn_frame, text="Limpiar",
-                                command=lambda: [e.delete(0, tk.END) for e in entries.values() if isinstance(e, ttk.Entry)])
-        btn_limpiar.pack(fill="x", pady=2)
+        btn_agregar.pack(fill="x", pady=3)
 
-        # ---- Tabla derecha
+        btn_editar = ttk.Button(btn_frame, text="Editar")
+        btn_editar.pack(fill="x", pady=3)
+
+        btn_eliminar = ttk.Button(btn_frame, text="Eliminar")
+        btn_eliminar.pack(fill="x", pady=3)
+
+        btn_limpiar = ttk.Button(btn_frame, text="Limpiar",
+                                command=lambda: [
+                                    e.delete(0, tk.END)
+                                    for k, e in entries.items()
+                                    if isinstance(e, ttk.Entry)
+                                ])
+        btn_limpiar.pack(fill="x", pady=3)
+
+        # ============================================================
+        # PANEL DERECHO – TREEVIEW
+        # ============================================================
         right = ttk.Frame(main_frame)
         right.pack(side="right", fill="both", expand=True)
 
-        columns = ["IDInsumos", "Categoría", "Nombre", "Cantidad Disponible", "Cantidad Dañada"]
+        columns = [
+            "ID", "Categoría", "Nombre", "Disponible", "Dañada",
+            "Proveedor", "Precio Compra", "Cantidad Comprada", "Fecha"
+        ]
+
         tree = self._create_treeview(right, columns)
 
-        # ===================== FUNCIONES =====================
+        # ============================================================
+        # FUNCIONES CRUD
+        # ============================================================
 
+        # --------- CARGAR INSUMOS ---------
         def cargar_insumos():
-            for i in tree.get_children():
-                tree.delete(i)
+            for item in tree.get_children():
+                tree.delete(item)
 
             cursor.execute("""
                 SELECT 
@@ -412,112 +544,168 @@ class RestauranteUI(tk.Tk):
                     C.NombreCategoria,
                     I.NombreInsumo,
                     I.CantidadDisponible,
-                    I.CantidadDañada
+                    I.CantidadDañada,
+                    P.NombreProveedor,
+                    PI.PrecioCompra,
+                    PI.CantidadComprada,
+                    PI.Dia, PI.Mes, PI.Ano
                 FROM Insumos I
-                JOIN CategoriaInsumos C
-                    ON C.IDCategoriaInsumos = I.IDCategoriaInsumos
+                JOIN CategoriaInsumos C ON C.IDCategoriaInsumos = I.IDCategoriaInsumos
+                LEFT JOIN ProveedoresInsumos PI ON PI.IDInsumos = I.IDInsumos
+                LEFT JOIN Proveedores P ON P.IDProveedor = PI.IDProveedor
                 ORDER BY I.IDInsumos ASC
             """)
 
             for row in cursor.fetchall():
-                tree.insert("", "end", values=list(row))
+                (id_in, cat, nombre, disp, danio,
+                proveedor, precio, cant_comp, dia, mes, ano) = row
 
+                fecha = f"{dia}/{mes}/{ano}" if dia and mes and ano else "—"
+
+                tree.insert(
+                    "", "end",
+                    values=[
+                        id_in, cat, nombre, disp, danio,
+                        proveedor or "—", precio or "—",
+                        cant_comp or "—", fecha
+                    ]
+                )
+
+        # --------- AGREGAR INSUMO ---------
         def agregar_insumo():
             try:
                 categoria = entries["Categoría"].get()
                 nombre = entries["Nombre"].get().strip()
-                cant = entries["Cantidad Disponible"].get().strip()
-                danio = entries["Cantidad Dañada"].get().strip()
+                disp = entries["Disponible"].get().strip()
+                danio = entries["Dañada"].get().strip()
+                proveedor = entries["Proveedor"].get()
+                precio = entries["Precio"].get().strip()
+                comprada = entries["Comprada"].get().strip()
+                fecha = entries["Fecha"].get().strip()
 
-                if not categoria or not nombre or not cant.isdigit():
-                    msg.showwarning("Atención", "Completa categoría, nombre y cantidad disponible.")
+                if not categoria or not nombre or not disp.isdigit() or not comprada.isdigit() or not precio.replace(".", "", 1).isdigit():
+                    msg.showwarning("Atención", "Complete todos los campos obligatorios.")
                     return
 
+                disp = int(disp)
                 danio = int(danio) if danio.isdigit() else 0
+                comprada = int(comprada)
+                precio = float(precio)
 
-                cursor.execute("SELECT IDCategoriaInsumos FROM CategoriaInsumos WHERE NombreCategoria=?", categoria)
+                cursor.execute("SELECT IDCategoriaInsumos FROM CategoriaInsumos WHERE NombreCategoria=?", (categoria,))
                 id_cat = cursor.fetchone()[0]
 
+                # Insertar en Insumos
                 cursor.execute("""
                     INSERT INTO Insumos (IDCategoriaInsumos, NombreInsumo, CantidadDisponible, CantidadDañada)
                     VALUES (?, ?, ?, ?)
-                """, (id_cat, nombre, int(cant), danio))
+                """, (id_cat, nombre, disp, danio))
+                conexion.commit()
+
+                cursor.execute("SELECT MAX(IDInsumos) FROM Insumos")
+                id_insumo = cursor.fetchone()[0]
+
+                # proveedor id
+                cursor.execute("SELECT IDProveedor FROM Proveedores WHERE NombreProveedor=?", (proveedor,))
+                id_prov = cursor.fetchone()[0]
+
+                try:
+                    dia, mes, ano = map(int, fecha.split("/"))
+                except:
+                    dia = mes = ano = None
+
+                # Insertar en ProveedoresInsumos
+                cursor.execute("""
+                    INSERT INTO ProveedoresInsumos 
+                    (IDInsumos, IDProveedor, PrecioCompra, CantidadComprada, Dia, Mes, Ano)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (id_insumo, id_prov, precio, comprada, dia, mes, ano))
 
                 conexion.commit()
-                msg.showinfo("Éxito", "Insumo agregado.")
+
+                msg.showinfo("Éxito", "Insumo agregado correctamente.")
                 cargar_insumos()
 
             except Exception as e:
-                msg.showerror("Error", f"No se pudo agregar:\n{e}")
+                msg.showerror("Error", f"No se pudo agregar el insumo:\n{e}")
 
+        # --------- ELIMINAR INSUMO ---------
         def eliminar_insumo():
             try:
                 sel = tree.selection()
                 if not sel:
-                    msg.showwarning("Atención", "Selecciona un insumo.")
-                    return
+                    return msg.showwarning("Atención", "Seleccione un insumo.")
 
                 id_ins = tree.item(sel)["values"][0]
 
-                try:
-                    cursor.execute("DELETE FROM Insumos WHERE IDInsumos=?", (id_ins,))
-                    conexion.commit()
-                    cargar_insumos()
-                    msg.showinfo("Éxito", "Insumo eliminado correctamente.")
-                except Exception as e:
-                    # Error por clave foránea → insumo usado en ProveedoresInsumos
-                    if "FK_Proveedor" in str(e) or "REFERENCE" in str(e):
-                        msg.showerror(
-                            "No permitido",
-                            "Este insumo no puede eliminarse porque está relacionado con proveedores."
-                        )
-                    else:
-                        msg.showerror("Error", str(e))
+                cursor.execute("DELETE FROM ProveedoresInsumos WHERE IDInsumos=?", (id_ins,))
+                cursor.execute("DELETE FROM Insumos WHERE IDInsumos=?", (id_ins,))
+                conexion.commit()
 
+                msg.showinfo("Éxito", "Insumo eliminado.")
+                cargar_insumos()
             except Exception as e:
-                msg.showerror("Error general", str(e))
+                msg.showerror("Error", f"No se pudo eliminar:\n{e}")
 
-
+        # --------- EDITAR INSUMO ---------
         def editar_insumo():
             try:
                 sel = tree.selection()
                 if not sel:
-                    msg.showwarning("Atención", "Selecciona un insumo.")
-                    return
+                    return msg.showwarning("Atención", "Seleccione un insumo.")
 
-                id_ins = int(tree.item(sel)["values"][0])
+                id_ins = tree.item(sel)["values"][0]
 
                 categoria = entries["Categoría"].get()
                 nombre = entries["Nombre"].get().strip()
-                cant = entries["Cantidad Disponible"].get().strip()
-                danio = entries["Cantidad Dañada"].get().strip()
+                disp = entries["Disponible"].get().strip()
+                danio = entries["Dañada"].get().strip()
+                proveedor = entries["Proveedor"].get()
+                precio = entries["Precio"].get().strip()
+                comprada = entries["Comprada"].get().strip()
+                fecha = entries["Fecha"].get().strip()
 
-                if not categoria or not nombre or not cant.isdigit():
-                    msg.showwarning("Atención", "Completa categoría, nombre y cantidad disponible.")
-                    return
+                if not categoria or not nombre or not disp.isdigit():
+                    return msg.showwarning("Atención", "Complete todos los campos.")
 
+                disp = int(disp)
                 danio = int(danio) if danio.isdigit() else 0
+                precio = float(precio)
+                comprada = int(comprada)
 
-                cursor.execute(
-                    "SELECT IDCategoriaInsumos FROM CategoriaInsumos WHERE NombreCategoria=?",
-                    categoria
-                )
+                cursor.execute("SELECT IDCategoriaInsumos FROM CategoriaInsumos WHERE NombreCategoria=?", (categoria,))
                 id_cat = cursor.fetchone()[0]
 
+                # actualizar Insumo
                 cursor.execute("""
                     UPDATE Insumos
                     SET IDCategoriaInsumos=?, NombreInsumo=?, CantidadDisponible=?, CantidadDañada=?
                     WHERE IDInsumos=?
-                """, (id_cat, nombre, int(cant), danio, id_ins))
+                """, (id_cat, nombre, disp, danio, id_ins))
+
+                cursor.execute("SELECT IDProveedor FROM Proveedores WHERE NombreProveedor=?", (proveedor,))
+                id_prov = cursor.fetchone()[0]
+
+                try:
+                    dia, mes, ano = map(int, fecha.split("/"))
+                except:
+                    dia = mes = ano = None
+
+                cursor.execute("""
+                    UPDATE ProveedoresInsumos
+                    SET IDProveedor=?, PrecioCompra=?, CantidadComprada=?, Dia=?, Mes=?, Ano=?
+                    WHERE IDInsumos=?
+                """, (id_prov, precio, comprada, dia, mes, ano, id_ins))
 
                 conexion.commit()
+
                 msg.showinfo("Éxito", "Insumo actualizado.")
                 cargar_insumos()
 
             except Exception as e:
-             msg.showerror("Error", f"No se pudo editar:\n{e}")
+                msg.showerror("Error", f"No se pudo editar:\n{e}")
 
-        # Asignar botones
+        # Asignar CRUD
         btn_agregar.config(command=agregar_insumo)
         btn_eliminar.config(command=eliminar_insumo)
         btn_editar.config(command=editar_insumo)
@@ -577,6 +765,7 @@ class RestauranteUI(tk.Tk):
         # --- Botones ---
         btn_frame = tk.Frame(left, bg="#E9E2D0")
         btn_frame.pack(pady=10, fill="x")
+
 
         btn_agregar = ttk.Button(btn_frame, text="Agregar")
         btn_agregar.pack(fill="x", pady=2)
