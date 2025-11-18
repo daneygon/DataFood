@@ -1,18 +1,27 @@
-from conexion_db import conectar  # type: ignore
-import tkinter.messagebox as msg
-
-
 import tkinter as tk
 from tkinter import ttk
+from tkinter import messagebox as msg   # <--- NUEVO
+import pyodbc                           # <--- NUEVO
 
 
+def conectar():
+    """Conexión a SQL Server (ajusta SERVER si lo necesitas)."""
+    try:
+        conexion = pyodbc.connect(
+            "DRIVER={ODBC Driver 17 for SQL Server};"
+            "SERVER=.;"                       # . = instancia local
+            "DATABASE=DataFood2;"
+            "Trusted_Connection=yes;"
+        )
+        print("Conexión establecida con SQL Server (DataFood2)")
+        return conexion
+    except Exception as e:
+        msg.showerror("Error de conexión", f"No se pudo conectar a la BD:\n{e}")
+        raise
 class RestauranteUI(tk.Tk):
     def __init__(self):
         super().__init__()
-    
 
-
-    
         # ---------- Ventana principal ---------------
         self.title("Sistema de Gestión de Restaurante - DataFood")
         self.geometry("1200x700")
@@ -21,32 +30,231 @@ class RestauranteUI(tk.Tk):
         # --------------- Estilo ------------------
         self._apply_style()
 
+        # Estado inicial del sidebar (visible)
+        self.sidebar_visible = True
+
         # --------------- Encabezado ------------------
         header = tk.Frame(self, bg="#C8B88A", height=50)
         header.pack(side="top", fill="x")
-        tk.Label(
+
+        # Para poder centrar el título y tener la flecha a la izquierda
+        header.grid_columnconfigure(1, weight=1)
+
+        # 🔽 Botón flecha para ocultar/mostrar el panel principal
+        self.btn_toggle_sidebar = tk.Button(
             header,
-            text="  DataFood  |  Sistema de Gestión de Restaurante",
+            text="⮜",  # flecha apuntando al sidebar
             bg="#C8B88A",
             fg="#ffffff",
-            font=("Segoe UI", 15, "bold"),
-        ).pack(pady=5)
+            bd=0,
+            font=("Segoe UI", 12, "bold"),
+            activebackground="#C8B88A",
+            activeforeground="#ffffff",
+            command=self._toggle_sidebar
+        )
+        self.btn_toggle_sidebar.grid(row=0, column=0, padx=(8, 5), pady=5)
 
-        # -------- Notebook (Tabs)
-        notebook = ttk.Notebook(self)
+        # Título centrado
+        tk.Label(
+            header,
+            text="DataFood  |  Sistema de Gestión de Restaurante",
+            bg="#C8B88A",
+            fg="#ffffff",
+            font=("Segoe UI", 15, "bold")
+        ).grid(row=0, column=1, pady=5)
+
+        # --------------- CONTENEDOR PRINCIPAL (3 COLUMNAS) ------------------
+        main_content = tk.Frame(self, bg="#F5F1E8")
+        main_content.pack(expand=True, fill="both", padx=10, pady=10)
+
+        # ------------------ COLUMNA IZQUIERDA (PANEL PRINCIPAL) -------------
+        self.sidebar = tk.Frame(main_content, bg="#C8B88A", width=230)
+        self.sidebar.pack(side="left", fill="y")
+        self.sidebar.pack_propagate(False)
+
+        tk.Label(
+            self.sidebar,
+            text="Food Delivery\nDataFood",
+            bg="#C8B88A",
+            fg="#FFFFFF",
+            font=("Segoe UI", 14, "bold"),
+            justify="left"
+        ).pack(padx=15, pady=(20, 10), anchor="w")
+
+        tk.Label(
+            self.sidebar,
+            text="Panel principal",
+            bg="#C8B88A",
+            fg="#FDF7EA",
+            font=("Segoe UI", 10)
+        ).pack(padx=15, anchor="w")
+
+        tk.Label(
+            self.sidebar,
+            text="────────────",
+            bg="#C8B88A",
+            fg="#FDF7EA"
+        ).pack(padx=15, pady=(5, 10), anchor="w")
+
+        # 🔙 Botón INICIO (encima de Gestión)
+        inicio_btn = ttk.Button(
+            self.sidebar,
+            text="Inicio",
+            command=self._mostrar_dashboard_inicial
+        )
+        inicio_btn.pack(fill="x", padx=15, pady=(5, 5))
+
+        # Botón de Gestión → ahora cambia el centro (no abre ventana nueva)
+        gestion_btn = ttk.Button(
+            self.sidebar,
+            text="Gestión",
+            command=self._abrir_ventana_gestion
+        )
+        gestion_btn.pack(fill="x", padx=15, pady=(5, 5))
+
+        ttk.Button(self.sidebar, text="Pedidos (próximamente)").pack(
+            fill="x", padx=15, pady=5
+        )
+        ttk.Button(self.sidebar, text="Reportes (próximamente)").pack(
+            fill="x", padx=15, pady=5
+        )
+
+        # ------------------ ZONA CENTRAL DINÁMICA ----------------
+        self.center_frame = tk.Frame(main_content, bg="#FFFFFF")
+        self.center_frame.pack(side="left", fill="both", expand=True, padx=10, pady=5)
+
+        # al iniciar, mostramos el “Menú de Platos y Bebidas”
+        self._mostrar_dashboard_inicial()
+
+        # ------------------ COLUMNA DERECHA (ESPACIO FUTURO) ----------------
+        self.right_frame = tk.Frame(main_content, bg="#F5F1E8", width=260)
+        self.right_frame.pack(side="left", fill="y")
+        self.right_frame.pack_propagate(False)
+
+        tk.Label(
+            self.right_frame,
+            text="Panel derecho\n(próximas funciones)",
+            bg="#F5F1E8",
+            fg="#444444",
+            font=("Segoe UI", 11, "bold"),
+            justify="center"
+        ).pack(padx=10, pady=20)
+
+        tk.Label(
+            self.right_frame,
+            text="Aquí puedes añadir más adelante:\n"
+                 "- Detalle del pedido actual\n"
+                 "- Resumen de venta\n"
+                 "- Métodos de pago, etc.",
+            bg="#F5F1E8",
+            fg="#666666",
+            font=("Segoe UI", 9),
+            justify="left"
+        ).pack(padx=10, pady=5)
+
+    def _mostrar_dashboard_inicial(self):
+        """Contenido central por defecto: Menú de Platos y Bebidas."""
+        # limpiar todo lo que haya en el centro
+        for widget in self.center_frame.winfo_children():
+            widget.destroy()
+
+        tk.Label(
+            self.center_frame,
+            text="Menú de Platos y Bebidas",
+            bg="#FFFFFF",
+            fg="#333333",
+            font=("Segoe UI", 14, "bold")
+        ).pack(anchor="w", padx=15, pady=(10, 5))
+
+        tk.Label(
+            self.center_frame,
+            text="Aquí irán las tarjetas/fotos de los platos y bebidas.\n"
+                 "Esta zona corresponde a donde ves las imágenes de comida en la referencia.",
+            bg="#FFFFFF",
+            fg="#666666",
+            font=("Segoe UI", 10),
+            justify="left"
+        ).pack(anchor="w", padx=15, pady=(0, 10))
+
+        cards_container = tk.Frame(self.center_frame, bg="#FFFFFF")
+        cards_container.pack(fill="both", expand=True, padx=15, pady=10)
+
+        frame_platos = tk.LabelFrame(
+            cards_container,
+            text="Menú de Platos",
+            bg="#FFFFFF",
+            fg="#333333",
+            font=("Segoe UI", 11, "bold")
+        )
+        frame_platos.pack(side="top", fill="both", expand=True, pady=(0, 10))
+
+        tk.Label(
+            frame_platos,
+            text="(Aquí puedes colocar una cuadrícula de platos con foto, nombre y precio.)",
+            bg="#FFFFFF",
+            fg="#666666",
+            font=("Segoe UI", 9)
+        ).pack(anchor="w", padx=10, pady=5)
+
+        frame_bebidas = tk.LabelFrame(
+            cards_container,
+            text="Menú de Bebidas",
+            bg="#FFFFFF",
+            fg="#333333",
+            font=("Segoe UI", 11, "bold")
+        )
+        frame_bebidas.pack(side="top", fill="both", expand=True)
+
+        tk.Label(
+            frame_bebidas,
+            text="(Aquí puedes colocar una cuadrícula de bebidas con foto, nombre y precio.)",
+            bg="#FFFFFF",
+            fg="#666666",
+            font=("Segoe UI", 9)
+        ).pack(anchor="w", padx=10, pady=5)
+
+    def _abrir_ventana_gestion(self):
+        """Muestra el notebook de CRUDs dentro del centro (misma ventana)."""
+        # limpiar contenido central
+        for widget in self.center_frame.winfo_children():
+            widget.destroy()
+
+        # contenedor para el título + notebook
+        container = tk.Frame(self.center_frame, bg="#F5F1E8")
+        container.pack(fill="both", expand=True)
+
+        tk.Label(
+            container,
+            text="Gestión de Datos  |  CRUD DataFood",
+            bg="#F5F1E8",
+            fg="#333333",
+            font=("Segoe UI", 14, "bold")
+        ).pack(anchor="w", padx=15, pady=(10, 5))
+
+        notebook = ttk.Notebook(container)
         notebook.pack(expand=True, fill="both", padx=10, pady=10)
-    
-
 
         self._create_tab_proveedores(notebook)
         self._create_tab_insumos(notebook)
         self._create_tab_produccion(notebook)
-        self._create_tab_menu_platos(notebook)
-        self._create_tab_menu_bebidas(notebook)
         self._create_tab_clientes(notebook)
         self._create_tab_ventas(notebook)
-        
-       
+
+    def _toggle_sidebar(self):
+        """Oculta o muestra el panel principal y expande/contrae el CRUD."""
+        if self.sidebar_visible:
+            # Ocultar panel izquierdo y derecho para que el CRUD use todo el ancho
+            self.sidebar.pack_forget()
+            self.right_frame.pack_forget()
+            self.btn_toggle_sidebar.config(text="⮞")  # flecha hacia la derecha (expandir)
+            self.sidebar_visible = False
+        else:
+            # Volver a mostrar ambos paneles
+            self.sidebar.pack(side="left", fill="y")
+            self.right_frame.pack(side="left", fill="y")
+            self.btn_toggle_sidebar.config(text="⮜")  # flecha hacia el panel
+            self.sidebar_visible = True
+
       
     # ------------------------- UI --------------------------------
 
