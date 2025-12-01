@@ -9,7 +9,7 @@ Proyecto final de Bases de Datos
 
 Primero, en la terminal de VSC 
 Ejecutar:
-pip install pyodbc
+pip install pyodbc y pip install pillow
 
 Luego solo copiar todos los archivos de code en una carpeta, Tener este Orden
 <img width="694" height="239" alt="image" src="https://github.com/user-attachments/assets/12cb3063-c7d2-48ec-ae7b-0bcff26dc256" />
