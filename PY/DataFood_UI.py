@@ -20,6 +20,8 @@ def conectar():
         msg.showerror("Error de conexión", f"No se pudo conectar a la BD:\n{e}")
         raise
 class RestauranteUI(tk.Tk):
+    LEFT_PANEL_WIDTH = 260
+
     def __init__(self):
         super().__init__()
 
@@ -30,12 +32,12 @@ class RestauranteUI(tk.Tk):
 
         # --------------- Estilo ------------------
         self._apply_style()
+        self.left_panel_width = 260
 
         # --------------- Encabezado ------------------
         header = tk.Frame(self, bg="#C8B88A", height=50)
         header.pack(side="top", fill="x")
 
-        # Título a la izquierda
         self.header_title = tk.Label(
             header,
             text="  DataFood  |  Sistema de Gestión de Restaurante",
@@ -45,7 +47,6 @@ class RestauranteUI(tk.Tk):
         )
         self.header_title.pack(side="left", pady=5, padx=10)
 
-        # ⏰ Hora a la derecha
         self.time_label = tk.Label(
             header,
             text="",
@@ -55,14 +56,13 @@ class RestauranteUI(tk.Tk):
         )
         self.time_label.pack(side="right", pady=5, padx=15)
 
-        # Iniciar actualización de la hora
         self._actualizar_hora()
 
         # --------------- CONTENEDOR PRINCIPAL (3 COLUMNAS) ------------------
         main_content = tk.Frame(self, bg="#F5F1E8")
         main_content.pack(expand=True, fill="both", padx=10, pady=10)
 
-        # ------------------ COLUMNA IZQUIERDA (GESTIÓN) ---------------------
+        # ------------------ COLUMNA IZQUIERDA (SIDEBAR) ---------------------
         self.sidebar = tk.Frame(main_content, bg="#C8B88A", width=230)
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
@@ -91,7 +91,6 @@ class RestauranteUI(tk.Tk):
             fg="#FDF7EA"
         ).pack(padx=15, pady=(5, 10), anchor="w")
 
-        # 🔙 Botón INICIO (encima de Gestión)
         inicio_btn = ttk.Button(
             self.sidebar,
             text="Inicio",
@@ -99,7 +98,6 @@ class RestauranteUI(tk.Tk):
         )
         inicio_btn.pack(fill="x", padx=15, pady=(5, 5))
 
-        # Botón de Gestión
         gestion_btn = ttk.Button(
             self.sidebar,
             text="Gestión",
@@ -118,10 +116,7 @@ class RestauranteUI(tk.Tk):
         self.center_frame = tk.Frame(main_content, bg="#FFFFFF")
         self.center_frame.pack(side="left", fill="both", expand=True, padx=10, pady=5)
 
-        # al iniciar, mostramos el “Menú de Platos y Bebidas”
-        self._mostrar_dashboard_inicial()
-
-        # ------------------ COLUMNA DERECHA (ESPACIO FUTURO) ----------------
+        # ------------------ COLUMNA DERECHA (SOLO PARA INICIO) ----------------
         self.right_panel = tk.Frame(main_content, bg="#F5F1E8", width=260)
         self.right_panel.pack(side="left", fill="y")
         self.right_panel.pack_propagate(False)
@@ -147,25 +142,24 @@ class RestauranteUI(tk.Tk):
             justify="left"
         ).pack(padx=10, pady=5)
 
-        # estado del panel lateral (para la flecha de los CRUD)
+        # estado de paneles
         self.sidebar_visible = True
+        self.right_panel_visible = True  # <- importante
 
-    # ------------------------------------------------------------------
-    # ⏰ HORA EN EL ENCABEZADO
-    # ------------------------------------------------------------------
-
-    def _actualizar_hora(self):
-        """Actualiza la hora en el encabezado cada segundo."""
-        # %I → hora en formato 12h, %p → AM/PM
-        ahora = datetime.now().strftime("%I:%M:%S %p")
-        self.time_label.config(text=ahora)
-        self.after(1000, self._actualizar_hora)
+        # al iniciar, mostramos el “Menú de Platos y Bebidas”
+        self._mostrar_dashboard_inicial()
 
     # ------------------------------------------------------------------
     # PÁGINA DE INICIO (MENÚ DE PLATOS Y BEBIDAS)
     # ------------------------------------------------------------------
     def _mostrar_dashboard_inicial(self):
         """Contenido central por defecto: Menú de Platos y Bebidas."""
+        # Asegurar que el panel derecho esté visible en el INICIO
+        if not getattr(self, "right_panel_visible", False):
+            self.right_panel.pack(side="left", fill="y")
+            self.right_panel.pack_propagate(False)
+            self.right_panel_visible = True
+
         # limpiar todo lo que haya en el centro
         for widget in self.center_frame.winfo_children():
             widget.destroy()
@@ -230,11 +224,17 @@ class RestauranteUI(tk.Tk):
     # ------------------------------------------------------------------
     def _abrir_ventana_gestion(self):
         """Muestra el notebook de CRUDs dentro del centro (misma ventana)."""
+
+        # 🔹 OCULTAR panel derecho mientras se está en los CRUDs
+        if getattr(self, "right_panel_visible", False):
+            self.right_panel.pack_forget()
+            self.right_panel_visible = False
+
         # limpiar contenido central
         for widget in self.center_frame.winfo_children():
             widget.destroy()
 
-        # contenedor para todo el CRUD, fondo blanco para evitar línea blanca
+        # contenedor para todo el CRUD
         container = tk.Frame(self.center_frame, bg="#FFFFFF")
         container.pack(fill="both", expand=True)
 
@@ -242,7 +242,6 @@ class RestauranteUI(tk.Tk):
         top_bar = tk.Frame(container, bg="#FFFFFF")
         top_bar.pack(fill="x", pady=(10, 5))
 
-        # guardamos la flecha en self.arrow_btn para poder cambiar el símbolo
         self.arrow_btn = tk.Button(
             top_bar,
             text="◀",              # triangulito hacia la izquierda
@@ -272,48 +271,42 @@ class RestauranteUI(tk.Tk):
         self._create_tab_clientes(notebook)
         self._create_tab_ventas(notebook)
 
-        # aseguramos el estado inicial
         self.sidebar_visible = True
 
+    # hora
+    def _actualizar_hora(self):
+        ahora = datetime.now().strftime("%I:%M:%S %p")
+        self.time_label.config(text=ahora)
+        # vuelve a llamarse dentro de 1000 ms (1 segundo)
+        self.after(1000, self._actualizar_hora)
+
     # ------------------------------------------------------------------
-    # TOGGLE DEL PANEL LATERAL (USADO SOLO POR LA FLECHA EN CRUDs)
+    # TOGGLE DEL PANEL LATERAL (SOLO SIDEBAR, SIN PANEL DERECHO)
     # ------------------------------------------------------------------
-      
     def _toggle_sidebar(self):
         """Oculta o muestra el panel lateral cuando se pulsa la flecha."""
         if self.sidebar_visible:
-            # ocultar panel izquierdo y derecho → expandir CRUD
+            # ocultar sidebar → el Treeview se expande
             self.sidebar.pack_forget()
-            self.right_panel.pack_forget()
-
-            # reempacamos el centro para asegurarnos que ocupa todo
             self.center_frame.pack_forget()
             self.center_frame.pack(
                 side="left", fill="both", expand=True, padx=10, pady=5
             )
 
             self.sidebar_visible = False
-
-            # cambiar flecha a triangulo hacia la derecha
             if hasattr(self, "arrow_btn"):
-                self.arrow_btn.config(text="▶")
-
+                self.arrow_btn.config(text="▶")   # flecha hacia la derecha
         else:
-            # volver a mostrar paneles → CRUD vuelve a compactarse
+            # volver a mostrar sidebar
             self.center_frame.pack_forget()
-
-            # orden correcto: sidebar | center_frame | right_panel
             self.sidebar.pack(side="left", fill="y")
             self.center_frame.pack(
                 side="left", fill="both", expand=True, padx=10, pady=5
             )
-            self.right_panel.pack(side="left", fill="y")
 
             self.sidebar_visible = True
-
-            # flecha vuelve a apuntar a la izquierda
             if hasattr(self, "arrow_btn"):
-                self.arrow_btn.config(text="◀")
+                self.arrow_btn.config(text="◀")   # flecha hacia la izquierda
 
 
     # ------------------------- UI --------------------------------
@@ -375,54 +368,80 @@ class RestauranteUI(tk.Tk):
         return tree
 
     # --------------------------------------------------------------------------------- CREATE TABS -----------------------------------
-    def _create_tab_content(self, parent, title, labels, tree_columns):
-        frame = ttk.Frame(parent)
-        frame.pack(fill="both", expand=True)
+    
+    # ---------------------------------------------------------------------------------
+    def _create_tab_content(self, parent, title, labels, tree_columns, special_widgets=None):
+        
+        # Frame que va dentro del tab del Notebook
+        frame_tab = ttk.Frame(parent)
+        frame_tab.pack(fill="both", expand=True)
 
-        # ---------- Panel izquierdo con scroll ----------
-        left_container = tk.Frame(frame, bg="#E9E2D0")
-        left_container.pack(side="left", fill="y")
+        # Frame principal interno
+        main_frame = tk.Frame(frame_tab, bg="#F5F1E8")
+        main_frame.pack(fill="both", expand=True)
 
-        canvas = tk.Canvas(left_container, bg="#E9E2D0", highlightthickness=0)
-        canvas.pack(side="left", fill="both", expand=True)
-
-        scrollbar_left = ttk.Scrollbar(
-            left_container, orient="vertical", command=canvas.yview
+        # ---------- PANEL IZQUIERDO CON SCROLL (FORMULARIO) ----------
+        left_container = tk.Frame(
+            main_frame, bg="#E9E2D0", width=self.LEFT_PANEL_WIDTH
         )
+        left_container.pack(side="left", fill="y")
+        left_container.pack_propagate(False)
+
+        # Canvas + scrollbar para poder desplazar campos y botones
+                # Canvas + scrollbar para poder desplazar campos y botones
+        canvas = tk.Canvas(left_container, bg="#E9E2D0", highlightthickness=0)
+
+        # ⬇️ Scrollbar VISIBLE, igual que la del Treeview
+        scrollbar_left = tk.Scrollbar(
+            left_container,
+            orient="vertical",
+            command=canvas.yview
+        )
+
+        # primero el scrollbar a la derecha, luego el canvas
         scrollbar_left.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
 
         canvas.configure(yscrollcommand=scrollbar_left.set)
 
-        # Frame interno desplazable
+
+        # Frame interior real donde van labels, entries y botones
         left = tk.Frame(canvas, bg="#E9E2D0", padx=15, pady=15)
         canvas.create_window((0, 0), window=left, anchor="nw")
 
-        # Permitir el scroll cuando el contenido crezca
-        def on_configure(event):
+        def on_left_configure(event):
             canvas.configure(scrollregion=canvas.bbox("all"))
 
-        left.bind("<Configure>", on_configure)
+        left.bind("<Configure>", on_left_configure)
 
-        # ---------- Contenido de la izquierda ----------
+        # ---------- CONTENIDO DEL FORM ----------
         tk.Label(
             left,
             text=f"📦 {title}",
             bg="#E9E2D0",
             font=("Segoe UI", 12, "bold"),
             fg="#6A4E23",
-        ).pack(pady=5)
+        ).pack(pady=(0, 10), anchor="w")
 
         entries = {}
         for lbl in labels:
-            tk.Label(left, text=lbl + ":", bg="#E9E2D0", font=("Segoe UI", 10)).pack(
-                anchor="w"
-            )
-            entry = ttk.Entry(left)
-            entry.pack(fill="x", pady=2)
-            entries[lbl] = entry
+            tk.Label(
+                left,
+                text=lbl + ":",
+                bg="#E9E2D0",
+                font=("Segoe UI", 10),
+            ).pack(anchor="w")
 
-        # ------------------------------------------------------------------------------ Botones
-        # Botones
+            # Si hay un widget especial para este campo, úsalo
+            if special_widgets and lbl in special_widgets:
+                widget = special_widgets[lbl](left)
+            else:
+                widget = ttk.Entry(left)
+
+            widget.pack(fill="x", pady=2)
+            entries[lbl] = widget
+
+        # ---------- BOTONES CRUD ----------
         btn_frame = tk.Frame(left, bg="#E9E2D0")
         btn_frame.pack(pady=10, fill="x")
 
@@ -436,26 +455,55 @@ class RestauranteUI(tk.Tk):
         btn_eliminar.pack(fill="x", pady=2)
         btn_limpiar.pack(fill="x", pady=2)
 
-        # ---------- Tabla derecha ----------
-        right = ttk.Frame(frame)
-        right.pack(side="right", fill="both", expand=True)
+        # ---------- FLECHITA ENTRE FORM Y TABLA ----------
+        middle_bar = tk.Frame(main_frame, bg="#F5F1E8", width=12)
+        middle_bar.pack(side="left", fill="y")
+
+        # ---------- TREEVIEW A LA DERECHA ----------
+        right = ttk.Frame(main_frame)
+        right.pack(side="left", fill="both", expand=True)
 
         tree = self._create_treeview(right, tree_columns)
+
+        form_visible = True  # estado interno de este TAB (no global)
+
+        def toggle_form():
+            nonlocal form_visible
+            if form_visible:
+                # Ocultar SOLO el panel izquierdo → Treeview ocupa más
+                left_container.pack_forget()
+                form_visible = False
+                arrow_btn.config(text="▶")  # apunta a la derecha
+            else:
+                # Para restaurar el orden correcto: left | middle_bar | right
+                right.pack_forget()
+                middle_bar.pack_forget()
+
+                left_container.pack(side="left", fill="y")
+                middle_bar.pack(side="left", fill="y")
+                right.pack(side="left", fill="both", expand=True)
+
+                form_visible = True
+                arrow_btn.config(text="◀")  # apunta a la izquierda
+
+        arrow_btn = tk.Button(
+            middle_bar,
+            text="◀",
+            bg="#F5F1E8",
+            bd=0,
+            font=("Segoe UI", 10, "bold"),
+            command=toggle_form,
+        )
+        arrow_btn.pack(padx=0, pady=0, fill="y")
+
+        # devolvemos todo lo que necesita cada tab
         return entries, tree, btn_agregar, btn_editar, btn_eliminar, btn_limpiar
 
-        # ---------- Tabla derecha ----------
-        right = ttk.Frame(frame)
-        right.pack(side="right", fill="both", expand=True)
 
-        tree = self._create_treeview(right, tree_columns)
-        return entries, tree
-    
 
-            # -------------------------------------------------------------
-    # FUNCIÓN GLOBAL – ACTUALIZA LISTA DE PROVEEDORES EN INSUMOS
-    # -------------------------------------------------------------
+# --------------------------------------proveedores global----------------------------------------------
     def cargar_proveedores_global(self):
-        """Carga la lista de proveedores en el combobox de Insumos."""
+        """Carga la lista de proveedores y, si el combo de Insumos existe y está vivo, lo actualiza."""
         try:
             conexion = conectar()
             cursor = conexion.cursor()
@@ -465,18 +513,32 @@ class RestauranteUI(tk.Tk):
                 FROM Proveedores
                 ORDER BY NombreProveedor
             """)
+            # Guardamos la lista como atributo de la clase
+            self.lista_proveedores = cursor.fetchall()
 
-            proveedores = cursor.fetchall()
-
-            # Guardar la lista dentro del objeto
-            self.lista_proveedores = proveedores
-
-            # Si existe combobox en insumos, actualizarlo:
+            # Intentar actualizar el combobox de Insumos solo si existe y NO está destruido
             if hasattr(self, "combo_proveedores_insumos"):
-                self.combo_proveedores_insumos["values"] = [p[1] for p in proveedores]
+                try:
+                    # winfo_exists() devuelve 1 si el widget sigue vivo en Tk
+                    if self.combo_proveedores_insumos.winfo_exists():
+                        self.combo_proveedores_insumos["values"] = [
+                            fila[1] for fila in self.lista_proveedores
+                        ]
+                except tk.TclError:
+                    # El widget ya no existe (por cambiar de pantalla, etc.), lo ignoramos
+                    pass
+
+            conexion.close()
 
         except Exception as e:
-            print("Error cargando proveedores global:", e)
+            # Aquí solo entramos si hay un problema REAL con la conexión/consulta
+            msg.showerror(
+                "Error de BD",
+                f"No se pudieron cargar los proveedores globales desde la base de datos:\n{e}"
+            )
+            self.lista_proveedores = []
+
+
 
     # ---------------- ------------------------------------------------------------------------TAB PROVEEDORES ----------------
     # ---------------- TAB PROVEEDORES ----------------
@@ -650,20 +712,171 @@ class RestauranteUI(tk.Tk):
             for e in entries.values():
                 e.delete(0, tk.END)
 
+
+
+                # -------------------------------------------------
+        # DETALLE AL HACER DOBLE CLIC (IGUAL QUE INSUMOS)
         # -------------------------------------------------
+        def mostrar_detalle_proveedor(event=None):
+            sel = tree.selection()
+            if not sel:
+                return
+
+            vals = tree.item(sel)["values"]
+            if not vals:
+                return
+
+            id_prov, nombre, telefono = vals
+
+            def safe(v):
+                return "—" if v in (None, "", "—") else v
+
+            # ---------- VENTANA ----------
+            detalle = tk.Toplevel(self)
+            detalle.title(f"Detalle del proveedor #{safe(id_prov)}")
+            detalle.configure(bg="#F5F1E8")
+
+            ancho_ventana = 460
+            alto_ventana = 260
+            detalle.geometry(f"{ancho_ventana}x{alto_ventana}")
+            detalle.minsize(420, 240)
+
+            detalle.update_idletasks()
+            sw = detalle.winfo_screenwidth()
+            sh = detalle.winfo_screenheight()
+            ww = detalle.winfo_width()
+            wh = detalle.winfo_height()
+            x = (sw // 2) - (ww // 2)
+            y = (sh // 2) - (wh // 2)
+            detalle.geometry(f"{ww}x{wh}+{x}+{y}")
+
+            container = tk.Frame(detalle, bg="#F5F1E8")
+            container.pack(fill="both", expand=True, padx=10, pady=10)
+
+            card = tk.Frame(
+                container,
+                bg="#FDF7EA",
+                bd=1,
+                relief="solid",
+                padx=10,
+                pady=10,
+            )
+            card.pack(fill="both", expand=True)
+
+            canvas_d = tk.Canvas(card, bg="#FDF7EA", highlightthickness=0)
+            canvas_d.pack(side="left", fill="both", expand=True)
+
+            scrollbar_d = ttk.Scrollbar(card, orient="vertical", command=canvas_d.yview)
+            scrollbar_d.pack(side="right", fill="y")
+
+            canvas_d.configure(yscrollcommand=scrollbar_d.set)
+
+            content = tk.Frame(canvas_d, bg="#FDF7EA")
+            canvas_d.create_window((0, 0), window=content, anchor="nw")
+
+            def on_configure(event):
+                canvas_d.configure(scrollregion=canvas_d.bbox("all"))
+
+            content.bind("<Configure>", on_configure)
+
+            # ----- título -----
+            tk.Label(
+                content,
+                text=f"Proveedor: {safe(nombre)}",
+                bg="#FDF7EA",
+                fg="#333333",
+                font=("Segoe UI", 12, "bold"),
+            ).grid(row=0, column=0, columnspan=2, pady=(5, 5), padx=5, sticky="w")
+
+            ttk.Separator(content, orient="horizontal").grid(
+                row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 8)
+            )
+
+            # ----- datos -----
+            datos = [
+                ("ID Proveedor", safe(id_prov)),
+                ("Nombre", safe(nombre)),
+                ("Teléfono", safe(telefono)),
+            ]
+
+            for i, (label_txt, valor) in enumerate(datos, start=2):
+                tk.Label(
+                    content,
+                    text=label_txt + ":",
+                    bg="#FDF7EA",
+                    fg="#6A4E23",
+                    font=("Segoe UI", 10, "bold"),
+                ).grid(row=i, column=0, sticky="w", padx=10, pady=3)
+
+                tk.Label(
+                    content,
+                    text=str(valor),
+                    bg="#FDF7EA",
+                    fg="#222222",
+                    font=("Segoe UI", 10),
+                ).grid(row=i, column=1, sticky="w", padx=5, pady=3)
+
+            last_row = len(datos) + 2
+
+            ttk.Separator(content, orient="horizontal").grid(
+                row=last_row, column=0, columnspan=2, sticky="ew", padx=5, pady=(8, 5)
+            )
+
+            # ----- botón EDITAR (rellena formulario de la izquierda) -----
+            def preparar_edicion():
+                entries["Nombre Proveedor"].delete(0, tk.END)
+                entries["Nombre Proveedor"].insert(
+                    0, "" if safe(nombre) == "—" else nombre
+                )
+
+                entries["Teléfono"].delete(0, tk.END)
+                entries["Teléfono"].insert(
+                    0, "" if safe(telefono) == "—" else telefono
+                )
+
+                detalle.destroy()
+
+            btn_editar_detalle = ttk.Button(
+                content, text="Editar", command=preparar_edicion
+            )
+            btn_editar_detalle.grid(
+                row=last_row + 1, column=0, padx=10, pady=(5, 10), sticky="w"
+            )
+
+            btn_cerrar = ttk.Button(content, text="Cerrar", command=detalle.destroy)
+            btn_cerrar.grid(
+                row=last_row + 1, column=1, padx=10, pady=(5, 10), sticky="e"
+            )
+
+            detalle.transient(self)
+            detalle.grab_set()
+
+        # doble clic → abrir detalle
+        tree.bind("<Double-1>", mostrar_detalle_proveedor)
+
+        # -------------------------------------------------
+        # ASIGNAR BOTONES
+        # -------------------------------------------------
+               # -------------------------------------------------
         # ASIGNAR BOTONES
         # -------------------------------------------------
         btn_agregar.config(command=agregar_proveedor)
         btn_eliminar.config(command=eliminar_proveedor)
-        btn_editar.config(command=editar_proveedor)
+
+        # Igual que en INSUMOS: este botón SOLO guarda cambios
+        btn_editar.config(text="Guardar cambios", command=editar_proveedor)
+
         btn_limpiar.config(command=limpiar)
 
         cargar_proveedores()
 
 
 
+
+
      # ---------------- ------------------------------------------------------------------TAB INSUMOS ----------------
-     
+
+        # ---------------- TAB INSUMOS ----------------
     def _create_tab_insumos(self, notebook):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text="Insumos")
@@ -671,137 +884,219 @@ class RestauranteUI(tk.Tk):
         conexion = conectar()
         cursor = conexion.cursor()
 
-        main_frame = tk.Frame(frame, bg="#F5F1E8")
-        main_frame.pack(fill="both", expand=True)
+        # --------- Definimos los campos del formulario ---------
+        labels = [
+            "Categoría",
+            "Nombre del Insumo",
+            "Cantidad Disponible",
+            "Cantidad Dañada",
+            "Proveedor",
+            "Precio Compra",
+            "Cantidad Comprada",
+            "Fecha de Ingreso (DD/MM/AAAA)",
+        ]
 
-        # =========== PANEL IZQUIERDO CON SCROLL ===========
-        left_container = tk.Frame(main_frame, bg="#E9E2D0")
-        left_container.pack(side="left", fill="y")
+        columns = [
+            "ID", "Categoría", "Nombre", "Disponible",
+            "Dañada", "Proveedor", "Precio Compra",
+            "Cantidad Comprada", "Fecha"
+        ]
 
-        canvas = tk.Canvas(left_container, bg="#E9E2D0", highlightthickness=0)
-        canvas.pack(side="left", fill="y", expand=False)
+        # Fábrica para crear Combobox
+        def make_combo(parent):
+            return ttk.Combobox(parent, state="readonly")
 
-        scrollbar_left = ttk.Scrollbar(left_container, orient="vertical", command=canvas.yview)
-        scrollbar_left.pack(side="right", fill="y")
+        special = {
+            "Categoría": make_combo,
+            "Proveedor": make_combo,
+        }
 
-        canvas.configure(yscrollcommand=scrollbar_left.set)
+        # Usamos la función genérica de molde
+        entries, tree, btn_agregar, btn_editar, btn_eliminar, btn_limpiar = (
+            self._create_tab_content(
+                frame,
+                "Gestión de Insumos",
+                labels,
+                columns,
+                special_widgets=special,
+            )
+        )
 
-        left = tk.Frame(canvas, bg="#E9E2D0", padx=15, pady=15)
-        canvas.create_window((0, 0), window=left, anchor="nw")
+        # Referencias rápidas
+        combo_categoria = entries["Categoría"]
+        self.combo_proveedores_insumos = entries["Proveedor"]
 
-        def update_scroll(_):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-        left.bind("<Configure>", update_scroll)
+        # Ocultar columnas a partir de "Dañada" en el Treeview (si quieres que se vean menos)
+        for col in ("Dañada", "Proveedor", "Precio Compra", "Cantidad Comprada", "Fecha"):
+            tree.column(col, width=0, stretch=False)
 
-        # =========== TITULO ===========
-        tk.Label(left, text="📦 Gestión de Insumos", bg="#E9E2D0",
-                font=("Segoe UI", 12, "bold"), fg="#6A4E23").pack(pady=(0,10))
-
-        entries = {}
-
-        # ============================================================
-        # 1️⃣ CATEGORÍA
-        # ============================================================
-        tk.Label(left, text="Categoría:", bg="#E9E2D0").pack(anchor="w")
-        combo_categoria = ttk.Combobox(left, state="readonly")
-        combo_categoria.pack(fill="x", pady=3)
-        entries["Categoría"] = combo_categoria
-
+        # ========== CARGAR COMBOS DESDE BD ==========
         cursor.execute("SELECT NombreCategoria FROM CategoriaInsumos ORDER BY NombreCategoria")
         combo_categoria["values"] = [row[0] for row in cursor.fetchall()]
 
-        # ============================================================
-        # 2️⃣ NOMBRE INSUMO
-        # ============================================================
-        tk.Label(left, text="Nombre del Insumo:", bg="#E9E2D0").pack(anchor="w")
-        e = ttk.Entry(left)
-        e.pack(fill="x", pady=3)
-        entries["Nombre"] = e
-
-        # ============================================================
-        # 3️⃣ CANTIDADES
-        # ============================================================
-        tk.Label(left, text="Cantidad Disponible:", bg="#E9E2D0").pack(anchor="w")
-        entries["Disponible"] = ttk.Entry(left)
-        entries["Disponible"].pack(fill="x", pady=3)
-
-        tk.Label(left, text="Cantidad Dañada:", bg="#E9E2D0").pack(anchor="w")
-        entries["Dañada"] = ttk.Entry(left)
-        entries["Dañada"].pack(fill="x", pady=3)
-
-        # ============================================================
-        # 4️⃣ PROVEEDOR (DINÁMICO)
-        # ============================================================
-        tk.Label(left, text="Proveedor:", bg="#E9E2D0").pack(anchor="w")
-        self.combo_proveedores_insumos = ttk.Combobox(left, state="readonly")
-        self.combo_proveedores_insumos.pack(fill="x", pady=3)
-        entries["Proveedor"] = self.combo_proveedores_insumos
-
+        # Cargar proveedores globalmente y llenar el combo
         self.cargar_proveedores_global()
         self.combo_proveedores_insumos["values"] = [p[1] for p in self.lista_proveedores]
 
         # ============================================================
-        # 5️⃣ PRECIO COMPRA
+        # VENTANA DE DETALLE AL HACER DOBLE CLIC
         # ============================================================
-        tk.Label(left, text="Precio Compra:", bg="#E9E2D0").pack(anchor="w")
-        entries["Precio"] = ttk.Entry(left)
-        entries["Precio"].pack(fill="x", pady=3)
+        def mostrar_detalle_insumo(event=None):
+            sel = tree.selection()
+            if not sel:
+                return
 
-        # ============================================================
-        # 6️⃣ CANTIDAD COMPRADA
-        # ============================================================
-        tk.Label(left, text="Cantidad Comprada:", bg="#E9E2D0").pack(anchor="w")
-        entries["Comprada"] = ttk.Entry(left)
-        entries["Comprada"].pack(fill="x", pady=3)
+            vals = tree.item(sel)["values"]
+            if not vals:
+                return
 
-        # ============================================================
-        # 7️⃣ FECHA
-        # ============================================================
-        tk.Label(left, text="Fecha de Ingreso (DD/MM/AAAA):", bg="#E9E2D0").pack(anchor="w")
-        entries["Fecha"] = ttk.Entry(left)
-        entries["Fecha"].pack(fill="x", pady=3)
+            def safe(v):
+                return "—" if v in (None, "", "—") else v
 
-        # ============================================================
-        # BOTONES
-        # ============================================================
-        btn_frame = tk.Frame(left, bg="#E9E2D0")
-        btn_frame.pack(pady=10, fill="x")
+            datos = [
+                ("ID",                 safe(vals[0])),
+                ("Categoría",          safe(vals[1])),
+                ("Nombre",             safe(vals[2])),
+                ("Cantidad disponible", safe(vals[3])),
+                ("Cantidad dañada",    safe(vals[4])),
+                ("Proveedor",          safe(vals[5])),
+                ("Precio compra",      safe(vals[6])),
+                ("Cantidad comprada",  safe(vals[7])),
+                ("Fecha de ingreso",   safe(vals[8])),
+            ]
 
-        btn_agregar = ttk.Button(btn_frame, text="Agregar")
-        btn_agregar.pack(fill="x", pady=3)
+            detalle = tk.Toplevel(self)
+            detalle.title(f"Detalle del insumo #{safe(vals[0])}")
+            detalle.configure(bg="#F5F1E8")
 
-        btn_editar = ttk.Button(btn_frame, text="Editar")
-        btn_editar.pack(fill="x", pady=3)
+            ancho_ventana = 460
+            alto_ventana = 300
+            detalle.geometry(f"{ancho_ventana}x{alto_ventana}")
+            detalle.minsize(420, 260)
 
-        btn_eliminar = ttk.Button(btn_frame, text="Eliminar")
-        btn_eliminar.pack(fill="x", pady=3)
+            detalle.update_idletasks()
+            sw = detalle.winfo_screenwidth()
+            sh = detalle.winfo_screenheight()
+            ww = detalle.winfo_width()
+            wh = detalle.winfo_height()
+            x = (sw // 2) - (ww // 2)
+            y = (sh // 2) - (wh // 2)
+            detalle.geometry(f"{ww}x{wh}+{x}+{y}")
 
-        btn_limpiar = ttk.Button(btn_frame, text="Limpiar",
-                                command=lambda: [
-                                    e.delete(0, tk.END)
-                                    for k, e in entries.items()
-                                    if isinstance(e, ttk.Entry)
-                                ])
-        btn_limpiar.pack(fill="x", pady=3)
+            container = tk.Frame(detalle, bg="#F5F1E8")
+            container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # ============================================================
-        # PANEL DERECHO – TREEVIEW
-        # ============================================================
-        right = ttk.Frame(main_frame)
-        right.pack(side="right", fill="both", expand=True)
+            card = tk.Frame(
+                container,
+                bg="#FDF7EA",
+                bd=1,
+                relief="solid",
+                padx=10,
+                pady=10,
+            )
+            card.pack(fill="both", expand=True)
 
-        columns = [
-            "ID", "Categoría", "Nombre", "Disponible", "Dañada",
-            "Proveedor", "Precio Compra", "Cantidad Comprada", "Fecha"
-        ]
+            canvas_d = tk.Canvas(card, bg="#FDF7EA", highlightthickness=0)
+            canvas_d.pack(side="left", fill="both", expand=True)
 
-        tree = self._create_treeview(right, columns)
+            scrollbar_d = ttk.Scrollbar(card, orient="vertical", command=canvas_d.yview)
+            scrollbar_d.pack(side="right", fill="y")
+
+            canvas_d.configure(yscrollcommand=scrollbar_d.set)
+
+            content = tk.Frame(canvas_d, bg="#FDF7EA")
+            canvas_d.create_window((0, 0), window=content, anchor="nw")
+
+            def on_configure(event):
+                canvas_d.configure(scrollregion=canvas_d.bbox("all"))
+
+            content.bind("<Configure>", on_configure)
+
+            tk.Label(
+                content,
+                text=f"Insumo: {safe(vals[2])}",
+                bg="#FDF7EA",
+                fg="#333333",
+                font=("Segoe UI", 12, "bold"),
+            ).grid(row=0, column=0, columnspan=2, pady=(5, 5), padx=5, sticky="w")
+
+            ttk.Separator(content, orient="horizontal").grid(
+                row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 8)
+            )
+
+            for i, (label_txt, valor) in enumerate(datos, start=2):
+                tk.Label(
+                    content,
+                    text=label_txt + ":",
+                    bg="#FDF7EA",
+                    fg="#6A4E23",
+                    font=("Segoe UI", 10, "bold"),
+                ).grid(row=i, column=0, sticky="w", padx=10, pady=3)
+
+                tk.Label(
+                    content,
+                    text=str(valor),
+                    bg="#FDF7EA",
+                    fg="#222222",
+                    font=("Segoe UI", 10),
+                ).grid(row=i, column=1, sticky="w", padx=5, pady=3)
+
+            last_row = len(datos) + 2
+
+            ttk.Separator(content, orient="horizontal").grid(
+                row=last_row, column=0, columnspan=2, sticky="ew", padx=5, pady=(8, 5)
+            )
+
+            # ----- botón EDITAR (rellena formulario de la izquierda) -----
+            def preparar_edicion():
+                cat, nombre, disp, dan, prov, precio, cant, fecha = (
+                    safe(vals[1]), safe(vals[2]), safe(vals[3]), safe(vals[4]),
+                    safe(vals[5]), safe(vals[6]), safe(vals[7]), safe(vals[8])
+                )
+
+                combo_categoria.set("" if cat == "—" else cat)
+                entries["Nombre del Insumo"].delete(0, tk.END)
+                entries["Nombre del Insumo"].insert(0, "" if nombre == "—" else nombre)
+
+                entries["Cantidad Disponible"].delete(0, tk.END)
+                entries["Cantidad Disponible"].insert(0, "" if disp == "—" else disp)
+
+                entries["Cantidad Dañada"].delete(0, tk.END)
+                entries["Cantidad Dañada"].insert(0, "" if dan == "—" else dan)
+
+                self.combo_proveedores_insumos.set("" if prov == "—" else prov)
+
+                entries["Precio Compra"].delete(0, tk.END)
+                entries["Precio Compra"].insert(0, "" if precio == "—" else precio)
+
+                entries["Cantidad Comprada"].delete(0, tk.END)
+                entries["Cantidad Comprada"].insert(0, "" if cant == "—" else cant)
+
+                entries["Fecha de Ingreso (DD/MM/AAAA)"].delete(0, tk.END)
+                entries["Fecha de Ingreso (DD/MM/AAAA)"].insert(0, "" if fecha == "—" else fecha)
+
+                detalle.destroy()
+
+            btn_editar_detalle = ttk.Button(
+                content, text="Editar este insumo", command=preparar_edicion
+            )
+            btn_editar_detalle.grid(
+                row=last_row + 1, column=0, padx=10, pady=(5, 10), sticky="w"
+            )
+
+            btn_cerrar = ttk.Button(content, text="Cerrar", command=detalle.destroy)
+            btn_cerrar.grid(
+                row=last_row + 1, column=1, padx=10, pady=(5, 10), sticky="e"
+            )
+
+            detalle.transient(self)
+            detalle.grab_set()
+
+        tree.bind("<Double-1>", mostrar_detalle_insumo)
 
         # ============================================================
         # FUNCIONES CRUD
         # ============================================================
-
-        # --------- CARGAR INSUMOS ---------
         def cargar_insumos():
             for item in tree.get_children():
                 tree.delete(item)
@@ -826,7 +1121,7 @@ class RestauranteUI(tk.Tk):
 
             for row in cursor.fetchall():
                 (id_in, cat, nombre, disp, danio,
-                proveedor, precio, cant_comp, dia, mes, ano) = row
+                 proveedor, precio, cant_comp, dia, mes, ano) = row
 
                 fecha = f"{dia}/{mes}/{ano}" if dia and mes and ano else "—"
 
@@ -839,17 +1134,16 @@ class RestauranteUI(tk.Tk):
                     ]
                 )
 
-        # --------- AGREGAR INSUMO ---------
         def agregar_insumo():
             try:
                 categoria = entries["Categoría"].get()
-                nombre = entries["Nombre"].get().strip()
-                disp = entries["Disponible"].get().strip()
-                danio = entries["Dañada"].get().strip()
+                nombre = entries["Nombre del Insumo"].get().strip()
+                disp = entries["Cantidad Disponible"].get().strip()
+                danio = entries["Cantidad Dañada"].get().strip()
                 proveedor = entries["Proveedor"].get()
-                precio = entries["Precio"].get().strip()
-                comprada = entries["Comprada"].get().strip()
-                fecha = entries["Fecha"].get().strip()
+                precio = entries["Precio Compra"].get().strip()
+                comprada = entries["Cantidad Comprada"].get().strip()
+                fecha = entries["Fecha de Ingreso (DD/MM/AAAA)"].get().strip()
 
                 if not categoria or not nombre or not disp.isdigit() or not comprada.isdigit() or not precio.replace(".", "", 1).isdigit():
                     msg.showwarning("Atención", "Complete todos los campos obligatorios.")
@@ -863,7 +1157,6 @@ class RestauranteUI(tk.Tk):
                 cursor.execute("SELECT IDCategoriaInsumos FROM CategoriaInsumos WHERE NombreCategoria=?", (categoria,))
                 id_cat = cursor.fetchone()[0]
 
-                # Insertar en Insumos
                 cursor.execute("""
                     INSERT INTO Insumos (IDCategoriaInsumos, NombreInsumo, CantidadDisponible, CantidadDañada)
                     VALUES (?, ?, ?, ?)
@@ -873,7 +1166,6 @@ class RestauranteUI(tk.Tk):
                 cursor.execute("SELECT MAX(IDInsumos) FROM Insumos")
                 id_insumo = cursor.fetchone()[0]
 
-                # proveedor id
                 cursor.execute("SELECT IDProveedor FROM Proveedores WHERE NombreProveedor=?", (proveedor,))
                 id_prov = cursor.fetchone()[0]
 
@@ -882,7 +1174,6 @@ class RestauranteUI(tk.Tk):
                 except:
                     dia = mes = ano = None
 
-                # Insertar en ProveedoresInsumos
                 cursor.execute("""
                     INSERT INTO ProveedoresInsumos 
                     (IDInsumos, IDProveedor, PrecioCompra, CantidadComprada, Dia, Mes, Ano)
@@ -897,7 +1188,6 @@ class RestauranteUI(tk.Tk):
             except Exception as e:
                 msg.showerror("Error", f"No se pudo agregar el insumo:\n{e}")
 
-        # --------- ELIMINAR INSUMO ---------
         def eliminar_insumo():
             try:
                 sel = tree.selection()
@@ -915,7 +1205,6 @@ class RestauranteUI(tk.Tk):
             except Exception as e:
                 msg.showerror("Error", f"No se pudo eliminar:\n{e}")
 
-        # --------- EDITAR INSUMO ---------
         def editar_insumo():
             try:
                 sel = tree.selection()
@@ -925,13 +1214,13 @@ class RestauranteUI(tk.Tk):
                 id_ins = tree.item(sel)["values"][0]
 
                 categoria = entries["Categoría"].get()
-                nombre = entries["Nombre"].get().strip()
-                disp = entries["Disponible"].get().strip()
-                danio = entries["Dañada"].get().strip()
+                nombre = entries["Nombre del Insumo"].get().strip()
+                disp = entries["Cantidad Disponible"].get().strip()
+                danio = entries["Cantidad Dañada"].get().strip()
                 proveedor = entries["Proveedor"].get()
-                precio = entries["Precio"].get().strip()
-                comprada = entries["Comprada"].get().strip()
-                fecha = entries["Fecha"].get().strip()
+                precio = entries["Precio Compra"].get().strip()
+                comprada = entries["Cantidad Comprada"].get().strip()
+                fecha = entries["Fecha de Ingreso (DD/MM/AAAA)"].get().strip()
 
                 if not categoria or not nombre or not disp.isdigit():
                     return msg.showwarning("Atención", "Complete todos los campos.")
@@ -944,7 +1233,6 @@ class RestauranteUI(tk.Tk):
                 cursor.execute("SELECT IDCategoriaInsumos FROM CategoriaInsumos WHERE NombreCategoria=?", (categoria,))
                 id_cat = cursor.fetchone()[0]
 
-                # actualizar Insumo
                 cursor.execute("""
                     UPDATE Insumos
                     SET IDCategoriaInsumos=?, NombreInsumo=?, CantidadDisponible=?, CantidadDañada=?
@@ -976,12 +1264,22 @@ class RestauranteUI(tk.Tk):
         # Asignar CRUD
         btn_agregar.config(command=agregar_insumo)
         btn_eliminar.config(command=eliminar_insumo)
-        btn_editar.config(command=editar_insumo)
+        btn_editar.config(text="Guardar cambios", command=editar_insumo)
+
+        def limpiar_campos():
+            for k, w in entries.items():
+                if isinstance(w, ttk.Entry):
+                    w.delete(0, tk.END)
+                elif isinstance(w, ttk.Combobox):
+                    w.set("")
+
+        btn_limpiar.config(command=limpiar_campos)
 
         cargar_insumos()
 
 
-    # --------------------------------------------------------- +---------TAB PRODUCCIÓN ----------------
+ # -----------------------------PRODUCCION 
+    # --------------------------------------------------------- TAB PRODUCCIÓN ----------------
     def _create_tab_produccion(self, notebook):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text="Producción")
@@ -989,22 +1287,7 @@ class RestauranteUI(tk.Tk):
         conexion = conectar()
         cursor = conexion.cursor()
 
-        # --- Frame principal ---
-        main_frame = tk.Frame(frame, bg="#F5F1E8")
-        main_frame.pack(fill="both", expand=True)
-
-        # --- Panel izquierdo ---
-        left = tk.Frame(main_frame, bg="#E9E2D0", padx=15, pady=15)
-        left.pack(side="left", fill="y")
-
-        tk.Label(
-            left,
-            text="📦 Registro de Producción",
-            bg="#E9E2D0",
-            font=("Segoe UI", 12, "bold"),
-            fg="#6A4E23",
-        ).pack(pady=(0, 10))
-
+        # --------- Campos del formulario ---------
         labels = [
             "Tipo de Producción",
             "Categoría",
@@ -1012,48 +1295,6 @@ class RestauranteUI(tk.Tk):
             "Cantidad",
             "Costo Unitario",
         ]
-        entries = {}
-
-        for lbl in labels:
-            tk.Label(left, text=f"{lbl}:", bg="#E9E2D0", font=("Segoe UI", 10)).pack(
-                anchor="w"
-            )
-            if lbl in ["Tipo de Producción", "Categoría"]:
-                combo = ttk.Combobox(left, state="readonly")
-                combo.pack(fill="x", pady=2)
-                entries[lbl] = combo
-            else:
-                entry = ttk.Entry(left)
-                entry.pack(fill="x", pady=2)
-                entries[lbl] = entry
-
-        # --- Combobox de tipo ---
-        entries["Tipo de Producción"]["values"] = ["Plato", "Bebida"]
-
-        # --- Botones ---
-        btn_frame = tk.Frame(left, bg="#E9E2D0")
-        btn_frame.pack(pady=10, fill="x")
-
-
-        btn_agregar = ttk.Button(btn_frame, text="Agregar")
-        btn_agregar.pack(fill="x", pady=2)
-        btn_editar = ttk.Button(btn_frame, text="Editar")
-        btn_editar.pack(fill="x", pady=2)
-        btn_eliminar = ttk.Button(btn_frame, text="Eliminar")
-        btn_eliminar.pack(fill="x", pady=2)
-        ttk.Button(
-            btn_frame,
-            text="Limpiar",
-            command=lambda: [
-                e.delete(0, tk.END)
-                for e in entries.values()
-                if isinstance(e, ttk.Entry)
-            ],
-        ).pack(fill="x", pady=2)
-
-        # --- Tabla derecha ---
-        right = ttk.Frame(main_frame)
-        right.pack(side="right", fill="both", expand=True)
 
         columns = [
             "IDProduccion",
@@ -1064,66 +1305,228 @@ class RestauranteUI(tk.Tk):
             "Costo Unitario",
             "Costo Producción Total",
         ]
-        tree = self._create_treeview(right, columns)
 
-        # ===================== FUNCIONES =====================
+        # Combobox para Tipo y Categoría
+        def make_combo(parent):
+            return ttk.Combobox(parent, state="readonly")
 
-        def fmt_cost(val):
-            """Formatea los costos o muestra '-' si es nulo."""
-            if val is None:
-                return "-"
-            try:
-                return f"{float(val):.2f}"
-            except Exception:
-                return str(val)
+        special = {
+            "Tipo de Producción": make_combo,
+            "Categoría": make_combo,
+        }
 
+        # ---------- Usamos el helper genérico ----------
+        entries, tree, btn_agregar, btn_editar, btn_eliminar, btn_limpiar = (
+            self._create_tab_content(
+                frame,
+                "Registro de Producción",
+                labels,
+                columns,
+                special_widgets=special,
+            )
+        )
+
+        combo_tipo = entries["Tipo de Producción"]
+        combo_categoria = entries["Categoría"]
+
+        combo_tipo["values"] = ["Plato", "Bebida"]
+
+        # ================= CARGAR CATEGORÍAS SEGÚN TIPO =================
         def cargar_categorias(event=None):
-            """Carga las categorías según el tipo de producción."""
-            tipo = entries["Tipo de Producción"].get()
+            tipo = combo_tipo.get()
             if tipo == "Plato":
-                cursor.execute("SELECT NombreCategoria FROM CategoriaPlatos")
+                cursor.execute(
+                    "SELECT NombreCategoria FROM CategoriaPlatos ORDER BY NombreCategoria"
+                )
             elif tipo == "Bebida":
-                cursor.execute("SELECT NombreCategoria FROM CategoriaBebidas")
+                cursor.execute(
+                    "SELECT NombreCategoria FROM CategoriaBebidas ORDER BY NombreCategoria"
+                )
             else:
-                entries["Categoría"]["values"] = []
+                combo_categoria["values"] = []
+                combo_categoria.set("")
                 return
+
             categorias = [row[0] for row in cursor.fetchall()]
-            entries["Categoría"]["values"] = categorias
+            combo_categoria["values"] = categorias
             if categorias:
-                entries["Categoría"].set(categorias[0])
+                combo_categoria.set(categorias[0])
 
-        entries["Tipo de Producción"].bind("<<ComboboxSelected>>", cargar_categorias)
+        combo_tipo.bind("<<ComboboxSelected>>", cargar_categorias)
 
+        # ================= VENTANA DE DETALLE (DOBLE CLIC) =================
+        def mostrar_detalle_produccion(event=None):
+            sel = tree.selection()
+            if not sel:
+                return
+
+            vals = tree.item(sel)["values"]
+            if not vals:
+                return
+
+            idp, tipo, categoria, nombre, cantidad, costo_unit, costo_total = vals
+
+            def safe(v):
+                return "—" if v in (None, "", "—") else v
+
+            detalle = tk.Toplevel(self)
+            detalle.title(f"Detalle de producción #{safe(idp)}")
+            detalle.configure(bg="#F5F1E8")
+
+            ancho_ventana = 480
+            alto_ventana = 280
+            detalle.geometry(f"{ancho_ventana}x{alto_ventana}")
+            detalle.minsize(440, 260)
+
+            detalle.update_idletasks()
+            sw = detalle.winfo_screenwidth()
+            sh = detalle.winfo_screenheight()
+            ww = detalle.winfo_width()
+            wh = detalle.winfo_height()
+            x = (sw // 2) - (ww // 2)
+            y = (sh // 2) - (wh // 2)
+            detalle.geometry(f"{ww}x{wh}+{x}+{y}")
+
+            container = tk.Frame(detalle, bg="#F5F1E8")
+            container.pack(fill="both", expand=True, padx=10, pady=10)
+
+            card = tk.Frame(
+                container,
+                bg="#FDF7EA",
+                bd=1,
+                relief="solid",
+                padx=10,
+                pady=10,
+            )
+            card.pack(fill="both", expand=True)
+
+            canvas_d = tk.Canvas(card, bg="#FDF7EA", highlightthickness=0)
+            canvas_d.pack(side="left", fill="both", expand=True)
+
+            scrollbar_d = ttk.Scrollbar(card, orient="vertical", command=canvas_d.yview)
+            scrollbar_d.pack(side="right", fill="y")
+
+            canvas_d.configure(yscrollcommand=scrollbar_d.set)
+
+            content = tk.Frame(canvas_d, bg="#FDF7EA")
+            canvas_d.create_window((0, 0), window=content, anchor="nw")
+
+            def on_configure(event):
+                canvas_d.configure(scrollregion=canvas_d.bbox("all"))
+
+            content.bind("<Configure>", on_configure)
+
+            tk.Label(
+                content,
+                text=f"Producción: {safe(nombre)}",
+                bg="#FDF7EA",
+                fg="#333333",
+                font=("Segoe UI", 12, "bold"),
+            ).grid(row=0, column=0, columnspan=2, pady=(5, 5), padx=5, sticky="w")
+
+            ttk.Separator(content, orient="horizontal").grid(
+                row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 8)
+            )
+
+            datos = [
+                ("ID Producción", safe(idp)),
+                ("Tipo", safe(tipo)),
+                ("Categoría", safe(categoria)),
+                ("Nombre", safe(nombre)),
+                ("Cantidad", safe(cantidad)),
+                ("Costo unitario", safe(costo_unit)),
+                ("Costo total producción", safe(costo_total)),
+            ]
+
+            for i, (label_txt, valor) in enumerate(datos, start=2):
+                tk.Label(
+                    content,
+                    text=label_txt + ":",
+                    bg="#FDF7EA",
+                    fg="#6A4E23",
+                    font=("Segoe UI", 10, "bold"),
+                ).grid(row=i, column=0, sticky="w", padx=10, pady=3)
+
+                tk.Label(
+                    content,
+                    text=str(valor),
+                    bg="#FDF7EA",
+                    fg="#222222",
+                    font=("Segoe UI", 10),
+                ).grid(row=i, column=1, sticky="w", padx=5, pady=3)
+
+            last_row = len(datos) + 2
+
+            ttk.Separator(content, orient="horizontal").grid(
+                row=last_row, column=0, columnspan=2, sticky="ew", padx=5, pady=(8, 5)
+            )
+
+            # ----- botón EDITAR (rellena formulario de la izquierda) -----
+            def preparar_edicion():
+                combo_tipo.set("" if safe(tipo) == "—" else tipo)
+                # recargar categorías para ese tipo
+                cargar_categorias()
+                combo_categoria.set("" if safe(categoria) == "—" else categoria)
+
+                entries["Nombre"].delete(0, tk.END)
+                entries["Nombre"].insert(0, "" if safe(nombre) == "—" else nombre)
+
+                entries["Cantidad"].delete(0, tk.END)
+                entries["Cantidad"].insert(0, "" if safe(cantidad) == "—" else cantidad)
+
+                entries["Costo Unitario"].delete(0, tk.END)
+                entries["Costo Unitario"].insert(
+                    0, "" if safe(costo_unit) == "—" else costo_unit
+                )
+
+                detalle.destroy()
+
+            btn_editar_detalle = ttk.Button(
+                content, text="Editar este registro", command=preparar_edicion
+            )
+            btn_editar_detalle.grid(
+                row=last_row + 1, column=0, padx=10, pady=(5, 10), sticky="w"
+            )
+
+            btn_cerrar = ttk.Button(content, text="Cerrar", command=detalle.destroy)
+            btn_cerrar.grid(
+                row=last_row + 1, column=1, padx=10, pady=(5, 10), sticky="e"
+            )
+
+            detalle.transient(self)
+            detalle.grab_set()
+
+        tree.bind("<Double-1>", mostrar_detalle_produccion)
+
+        # ================= CARGAR PRODUCCIÓN =================
         def cargar_produccion():
-            """Carga correctamente los registros de Producción mostrando costos reales desde SQL."""
             for i in tree.get_children():
                 tree.delete(i)
 
             query = """
-            SELECT 
-                P.IDProduccion,
-                CASE 
-                    WHEN MP.IDProduccion IS NOT NULL THEN 'Plato'
-                    WHEN MB.IDProduccion IS NOT NULL THEN 'Bebida'
-                    ELSE 'Sin tipo'
-                END AS Tipo,
-                COALESCE(CP.NombreCategoria, CB.NombreCategoria, 'Sin categoría') AS Categoria,
-                COALESCE(MP.NombrePlato, MB.NombreBebida, 'Sin nombre') AS Nombre,
-                COALESCE(P.CantidadDePlatos, P.CantidadDeBebidas, 0) AS Cantidad,
-                CASE 
-                    WHEN MP.IDProduccion IS NOT NULL THEN P.CostoPorPlato
-                    WHEN MB.IDProduccion IS NOT NULL THEN P.CostoPorBebida
-                    ELSE 0
-                END AS CostoUnitario,
-                P.CostoProduccionTotal AS CostoTotal
-            FROM Produccion P
-            LEFT JOIN MenuDePlatos MP ON MP.IDProduccion = P.IDProduccion
-            LEFT JOIN CategoriaPlatos CP ON CP.IDCategoriaPlatos = MP.IDCategoriaPlatos
-            LEFT JOIN MenuDeBebidas MB ON MB.IDProduccion = P.IDProduccion
-            LEFT JOIN CategoriaBebidas CB ON CB.IDCategoriaBebidas = MB.IDCategoriaBebidas
-            ORDER BY P.IDProduccion ASC;
+                SELECT 
+                    P.IDProduccion,
+                    CASE 
+                        WHEN MP.IDProduccion IS NOT NULL THEN 'Plato'
+                        WHEN MB.IDProduccion IS NOT NULL THEN 'Bebida'
+                        ELSE 'Sin tipo'
+                    END AS Tipo,
+                    COALESCE(CP.NombreCategoria, CB.NombreCategoria, 'Sin categoría') AS Categoria,
+                    COALESCE(MP.NombrePlato, MB.NombreBebida, 'Sin nombre') AS Nombre,
+                    COALESCE(P.CantidadDePlatos, P.CantidadDeBebidas, 0) AS Cantidad,
+                    CASE 
+                        WHEN MP.IDProduccion IS NOT NULL THEN P.CostoPorPlato
+                        WHEN MB.IDProduccion IS NOT NULL THEN P.CostoPorBebida
+                        ELSE 0
+                    END AS CostoUnitario,
+                    P.CostoProduccionTotal AS CostoTotal
+                FROM Produccion P
+                LEFT JOIN MenuDePlatos MP ON MP.IDProduccion = P.IDProduccion
+                LEFT JOIN CategoriaPlatos CP ON CP.IDCategoriaPlatos = MP.IDCategoriaPlatos
+                LEFT JOIN MenuDeBebidas MB ON MB.IDProduccion = P.IDProduccion
+                LEFT JOIN CategoriaBebidas CB ON CB.IDCategoriaBebidas = MB.IDCategoriaBebidas
+                ORDER BY P.IDProduccion ASC;
             """
-
             cursor.execute(query)
             filas = cursor.fetchall()
 
@@ -1143,89 +1546,115 @@ class RestauranteUI(tk.Tk):
                     ],
                 )
 
- # ---------- FUNCIONES CRUD ----------
-
+        # ================= FUNCIONES CRUD =================
 
         def agregar_produccion():
             try:
-                tipo = entries["Tipo de Producción"].get()
-                categoria = entries["Categoría"].get()
+                tipo = combo_tipo.get()
+                categoria = combo_categoria.get()
                 nombre = entries["Nombre"].get().strip()
                 cantidad_str = entries["Cantidad"].get().strip()
                 costo_str = entries["Costo Unitario"].get().strip()
 
-                if (not tipo or not categoria or not nombre or not cantidad_str or not costo_str):
+                if (
+                    not tipo
+                    or not categoria
+                    or not nombre
+                    or not cantidad_str
+                    or not costo_str
+                ):
                     msg.showwarning("Atención", "Completa todos los campos.")
                     return
 
-                if (not cantidad_str.isdigit() or not costo_str.replace(".", "", 1).isdigit()):
-                    msg.showwarning("Atención", "Cantidad y costo deben ser numéricos.")
+                if not cantidad_str.isdigit() or not costo_str.replace(".", "", 1).isdigit():
+                    msg.showwarning(
+                        "Atención", "Cantidad y costo unitario deben ser numéricos."
+                    )
                     return
 
                 cantidad = int(cantidad_str)
                 costo_unit = float(costo_str)
-
-                # Cálculo total
                 costo_total = cantidad * costo_unit
 
-                # Insert base
-                cursor.execute("""
-                    INSERT INTO Produccion (CantidadDeBebidas, CantidadDePlatos,
-                                            NombreBebida, NombrePlato,
-                                            CostoPorPlato, CostoPorBebida,
-                                            CostoProduccionTotal)
+                # Insert base en Produccion
+                cursor.execute(
+                    """
+                    INSERT INTO Produccion (
+                        CantidadDeBebidas, CantidadDePlatos,
+                        NombreBebida, NombrePlato,
+                        CostoPorPlato, CostoPorBebida,
+                        CostoProduccionTotal
+                    )
                     VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL)
-                """)
+                """
+                )
                 conexion.commit()
 
                 cursor.execute("SELECT MAX(IDProduccion) FROM Produccion")
                 id_prod = cursor.fetchone()[0]
 
-                # Plato
                 if tipo == "Plato":
-                    cursor.execute("SELECT IDCategoriaPlatos FROM CategoriaPlatos WHERE NombreCategoria=?", (categoria,))
+                    cursor.execute(
+                        "SELECT IDCategoriaPlatos FROM CategoriaPlatos WHERE NombreCategoria=?",
+                        (categoria,),
+                    )
                     id_cat = cursor.fetchone()[0]
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO MenuDePlatos (IDProduccion, IDCategoriaPlatos, NombrePlato, Precio)
                         VALUES (?, ?, ?, ?)
-                    """, (id_prod, id_cat, nombre, costo_unit))
+                    """,
+                        (id_prod, id_cat, nombre, costo_unit),
+                    )
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         UPDATE Produccion
                         SET CantidadDePlatos=?, NombrePlato=?, CostoPorPlato=?, CostoProduccionTotal=?
                         WHERE IDProduccion=?
-                    """, (cantidad, nombre, costo_unit, costo_total, id_prod))
+                    """,
+                        (cantidad, nombre, costo_unit, costo_total, id_prod),
+                    )
 
-                # Bebida
-                else:
-                    cursor.execute("SELECT IDCategoriaBebidas FROM CategoriaBebidas WHERE NombreCategoria=?", (categoria,))
+                elif tipo == "Bebida":
+                    cursor.execute(
+                        "SELECT IDCategoriaBebidas FROM CategoriaBebidas WHERE NombreCategoria=?",
+                        (categoria,),
+                    )
                     id_cat = cursor.fetchone()[0]
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO MenuDeBebidas (IDProduccion, IDCategoriaBebidas, NombreBebida, Precio)
                         VALUES (?, ?, ?, ?)
-                    """, (id_prod, id_cat, nombre, costo_unit))
+                    """,
+                        (id_prod, id_cat, nombre, costo_unit),
+                    )
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         UPDATE Produccion
                         SET CantidadDeBebidas=?, NombreBebida=?, CostoPorBebida=?, CostoProduccionTotal=?
                         WHERE IDProduccion=?
-                    """, (cantidad, nombre, costo_unit, costo_total, id_prod))
+                    """,
+                        (cantidad, nombre, costo_unit, costo_total, id_prod),
+                    )
 
                 conexion.commit()
-                msg.showinfo("Éxito", "Registro agregado correctamente.")
+                msg.showinfo("Éxito", "Registro de producción agregado correctamente.")
                 cargar_produccion()
 
             except Exception as e:
                 msg.showerror("Error", f"No se pudo agregar el registro:\n{e}")
 
-
         def eliminar_produccion():
             try:
                 sel = tree.selection()
                 if not sel:
-                    msg.showwarning("Atención", "Selecciona un registro para eliminar.")
+                    msg.showwarning(
+                        "Atención", "Selecciona un registro de producción para eliminar."
+                    )
                     return
 
                 id_prod = int(tree.item(sel)["values"][0])
@@ -1239,58 +1668,100 @@ class RestauranteUI(tk.Tk):
                 cargar_produccion()
 
             except Exception as e:
-                msg.showerror("Error", f"No se pudo eliminar:\n{e}")
-
+                msg.showerror("Error", f"No se pudo eliminar el registro:\n{e}")
 
         def editar_produccion():
             try:
                 sel = tree.selection()
                 if not sel:
-                    msg.showwarning("Atención", "Selecciona un registro para editar.")
+                    msg.showwarning(
+                        "Atención", "Selecciona un registro de producción para editar."
+                    )
                     return
 
-                vals = tree.item(sel)["values"]
-                id_prod = int(vals[0])
+                id_prod = int(tree.item(sel)["values"][0])
 
-                tipo = entries["Tipo de Producción"].get()
-                categoria = entries["Categoría"].get()
+                tipo = combo_tipo.get()
+                categoria = combo_categoria.get()
                 nombre = entries["Nombre"].get().strip()
-                cantidad = int(entries["Cantidad"].get())
-                costo_unit = float(entries["Costo Unitario"].get())
+                cantidad_str = entries["Cantidad"].get().strip()
+                costo_str = entries["Costo Unitario"].get().strip()
+
+                if (
+                    not tipo
+                    or not categoria
+                    or not nombre
+                    or not cantidad_str
+                    or not costo_str
+                ):
+                    msg.showwarning("Atención", "Completa todos los campos.")
+                    return
+
+                if not cantidad_str.isdigit() or not costo_str.replace(".", "", 1).isdigit():
+                    msg.showwarning(
+                        "Atención", "Cantidad y costo unitario deben ser numéricos."
+                    )
+                    return
+
+                cantidad = int(cantidad_str)
+                costo_unit = float(costo_str)
                 costo_total = cantidad * costo_unit
 
+                # Limpiar vínculos en menús
                 cursor.execute("DELETE FROM MenuDePlatos WHERE IDProduccion=?", (id_prod,))
                 cursor.execute("DELETE FROM MenuDeBebidas WHERE IDProduccion=?", (id_prod,))
 
                 if tipo == "Plato":
-                    cursor.execute("SELECT IDCategoriaPlatos FROM CategoriaPlatos WHERE NombreCategoria=?", (categoria,))
+                    cursor.execute(
+                        "SELECT IDCategoriaPlatos FROM CategoriaPlatos WHERE NombreCategoria=?",
+                        (categoria,),
+                    )
                     id_cat = cursor.fetchone()[0]
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         UPDATE Produccion
-                        SET CantidadDePlatos=?, NombrePlato=?, CostoPorPlato=?, CostoProduccionTotal=?
+                        SET CantidadDePlatos=?, NombrePlato=?, CostoPorPlato=?, 
+                            CantidadDeBebidas=NULL, NombreBebida=NULL, CostoPorBebida=NULL,
+                            CostoProduccionTotal=?
                         WHERE IDProduccion=?
-                    """, (cantidad, nombre, costo_unit, costo_total, id_prod))
+                    """,
+                        (cantidad, nombre, costo_unit, costo_total, id_prod),
+                    )
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO MenuDePlatos (IDProduccion, IDCategoriaPlatos, NombrePlato, Precio)
                         VALUES (?, ?, ?, ?)
-                    """, (id_prod, id_cat, nombre, costo_unit))
+                    """,
+                        (id_prod, id_cat, nombre, costo_unit),
+                    )
 
-                else:
-                    cursor.execute("SELECT IDCategoriaBebidas FROM CategoriaBebidas WHERE NombreCategoria=?", (categoria,))
+                elif tipo == "Bebida":
+                    cursor.execute(
+                        "SELECT IDCategoriaBebidas FROM CategoriaBebidas WHERE NombreCategoria=?",
+                        (categoria,),
+                    )
                     id_cat = cursor.fetchone()[0]
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         UPDATE Produccion
-                        SET CantidadDeBebidas=?, NombreBebida=?, CostoPorBebida=?, CostoProduccionTotal=?
+                        SET CantidadDeBebidas=?, NombreBebida=?, CostoPorBebida=?, 
+                            CantidadDePlatos=NULL, NombrePlato=NULL, CostoPorPlato=NULL,
+                            CostoProduccionTotal=?
                         WHERE IDProduccion=?
-                    """, (cantidad, nombre, costo_unit, costo_total, id_prod))
+                    """,
+                        (cantidad, nombre, costo_unit, costo_total, id_prod),
+                    )
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO MenuDeBebidas (IDProduccion, IDCategoriaBebidas, NombreBebida, Precio)
                         VALUES (?, ?, ?, ?)
-                    """, (id_prod, id_cat, nombre, costo_unit))
+                    """,
+                        (id_prod, id_cat, nombre, costo_unit),
+                    )
 
                 conexion.commit()
                 msg.showinfo("Éxito", "Registro actualizado.")
@@ -1299,16 +1770,20 @@ class RestauranteUI(tk.Tk):
             except Exception as e:
                 msg.showerror("Error", f"No se pudo editar el registro:\n{e}")
 
+        def limpiar_campos():
+            for k, w in entries.items():
+                if isinstance(w, ttk.Entry):
+                    w.delete(0, tk.END)
+                elif isinstance(w, ttk.Combobox):
+                    w.set("")
 
-        # --- ASIGNAR BOTONES ---
+        # ---------- Asignar botones ----------
         btn_agregar.config(command=agregar_produccion)
         btn_eliminar.config(command=eliminar_produccion)
-        btn_editar.config(command=editar_produccion)
+        btn_editar.config(text="Guardar cambios", command=editar_produccion)
+        btn_limpiar.config(command=limpiar_campos)
 
         cargar_produccion()
-
-
-   
 
     #----------------------------------------------------------------------------------TAB MENU DE PLATOS
 
@@ -1339,6 +1814,7 @@ class RestauranteUI(tk.Tk):
 
         # -------------------------------------  TAB CLIENTES ----------------
 
+        # -------------------------------------  TAB CLIENTES ----------------
     def _create_tab_clientes(self, notebook):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text="Clientes")
@@ -1369,16 +1845,17 @@ class RestauranteUI(tk.Tk):
         )
 
         # ---------- Conexión a la base de datos ----------
-        self.conexion = conectar()
-        self.cursor = self.conexion.cursor()
-        conexion = self.conexion
-        cursor = self.cursor
+        conexion = conectar()
+        cursor = conexion.cursor()
 
-        # ---------- FUNCIONES CRUD ----------
+        # -------------------------------------------------
+        # CARGAR CLIENTES EN EL TREEVIEW
+        # -------------------------------------------------
         def cargar_clientes():
             """Carga los clientes desde SQL Server en la tabla."""
             for fila in tree.get_children():
                 tree.delete(fila)
+
             cursor.execute(
                 """
                 SELECT c.IDClientes, c.NumeroDeMesa, c.Nombre1, c.Nombre2, 
@@ -1389,12 +1866,12 @@ class RestauranteUI(tk.Tk):
             """
             )
             for row in cursor.fetchall():
-                tree.insert(
-                    "",
-                    "end",
-                    values=["—" if x is None else str(x).strip() for x in row],
-                )
+                valores = [("—" if x is None else str(x).strip()) for x in row]
+                tree.insert("", "end", values=valores)
 
+        # -------------------------------------------------
+        # AGREGAR CLIENTE
+        # -------------------------------------------------
         def agregar_cliente():
             """Agrega un nuevo cliente con su teléfono."""
             try:
@@ -1414,14 +1891,14 @@ class RestauranteUI(tk.Tk):
                 if not nombre1 or not apellido1:
                     msg.showwarning(
                         "Atención",
-                        "Debe ingresar al menos el primer nombre y apellido.",
+                        "Debe ingresar al menos el primer nombre y primer apellido.",
                     )
                     return
                 if not telefono:
                     msg.showwarning("Atención", "Debe ingresar un número de teléfono.")
                     return
 
-                # --- Insertar teléfono y obtener su ID de forma segura ---
+                # --- Insertar teléfono y obtener su ID ---
                 cursor.execute(
                     """
                     INSERT INTO TelefonoCliente (Telefono)
@@ -1458,18 +1935,37 @@ class RestauranteUI(tk.Tk):
             except Exception as e:
                 msg.showerror("Error", f"No se pudo agregar el cliente:\n{e}")
 
+        # -------------------------------------------------
+        # ELIMINAR CLIENTE
+        # -------------------------------------------------
         def eliminar_cliente():
-            """Elimina el cliente seleccionado en la tabla."""
+            """Elimina el cliente seleccionado en la tabla (y su teléfono asociado)."""
             try:
                 seleccionado = tree.selection()
                 if not seleccionado:
                     msg.showwarning("Atención", "Selecciona un cliente para eliminar.")
                     return
 
-                id_cliente = tree.item(seleccionado)["values"][0]
-                id_cliente = int(str(id_cliente).strip("(), '"))
+                vals = tree.item(seleccionado)["values"]
+                if not vals:
+                    return
 
-                cursor.execute("DELETE FROM Clientes WHERE IDClientes = ?", id_cliente)
+                id_cliente = int(vals[0])
+
+                # Obtener IDTelefonoClientes para borrar también el teléfono
+                cursor.execute(
+                    "SELECT IDTelefonoClientes FROM Clientes WHERE IDClientes = ?",
+                    (id_cliente,),
+                )
+                row_tel = cursor.fetchone()
+                id_tel = row_tel[0] if row_tel else None
+
+                cursor.execute("DELETE FROM Clientes WHERE IDClientes = ?", (id_cliente,))
+                if id_tel is not None:
+                    cursor.execute(
+                        "DELETE FROM TelefonoCliente WHERE IDTelefonoClientes = ?",
+                        (id_tel,),
+                    )
                 conexion.commit()
 
                 msg.showinfo("Éxito", "Cliente eliminado correctamente.")
@@ -1478,16 +1974,22 @@ class RestauranteUI(tk.Tk):
             except Exception as e:
                 msg.showerror("Error", f"No se pudo eliminar el cliente:\n{e}")
 
+        # -------------------------------------------------
+        # EDITAR CLIENTE (GUARDAR CAMBIOS)
+        # -------------------------------------------------
         def editar_cliente():
-            """Edita el cliente seleccionado."""
+            """Guarda cambios del cliente seleccionado, usando el formulario."""
             try:
                 seleccionado = tree.selection()
                 if not seleccionado:
                     msg.showwarning("Atención", "Selecciona un cliente para editar.")
                     return
 
-                id_cliente = tree.item(seleccionado)["values"][0]
-                id_cliente = int(str(id_cliente).strip("(), '"))
+                vals = tree.item(seleccionado)["values"]
+                if not vals:
+                    return
+
+                id_cliente = int(vals[0])
 
                 mesa = entries["Número de Mesa"].get().strip()
                 nombre1 = entries["Nombre1"].get().strip()
@@ -1504,7 +2006,7 @@ class RestauranteUI(tk.Tk):
                 if not nombre1 or not apellido1:
                     msg.showwarning(
                         "Atención",
-                        "Debe ingresar al menos el primer nombre y apellido.",
+                        "Debe ingresar al menos el primer nombre y primer apellido.",
                     )
                     return
                 if not telefono:
@@ -1541,19 +2043,174 @@ class RestauranteUI(tk.Tk):
             except Exception as e:
                 msg.showerror("Error", f"No se pudo editar el cliente:\n{e}")
 
+        # -------------------------------------------------
+        # LIMPIAR CAMPOS
+        # -------------------------------------------------
         def limpiar_campos():
             """Limpia todos los campos de entrada."""
             for e in entries.values():
                 e.delete(0, tk.END)
 
+        # -------------------------------------------------
+        # DETALLE AL HACER DOBLE CLIC
+        # -------------------------------------------------
+        def mostrar_detalle_cliente(event=None):
+            sel = tree.selection()
+            if not sel:
+                return
+
+            vals = tree.item(sel)["values"]
+            if not vals:
+                return
+
+            id_cliente, mesa, n1, n2, a1, a2, tel = vals
+
+            def safe(v):
+                return "—" if v in (None, "", "—") else v
+
+            detalle = tk.Toplevel(self)
+            detalle.title(f"Detalle del cliente #{safe(id_cliente)}")
+            detalle.configure(bg="#F5F1E8")
+
+            ancho_ventana = 480
+            alto_ventana = 320
+            detalle.geometry(f"{ancho_ventana}x{alto_ventana}")
+            detalle.minsize(440, 280)
+
+            detalle.update_idletasks()
+            sw = detalle.winfo_screenwidth()
+            sh = detalle.winfo_screenheight()
+            ww = detalle.winfo_width()
+            wh = detalle.winfo_height()
+            x = (sw // 2) - (ww // 2)
+            y = (sh // 2) - (wh // 2)
+            detalle.geometry(f"{ww}x{wh}+{x}+{y}")
+
+            container = tk.Frame(detalle, bg="#F5F1E8")
+            container.pack(fill="both", expand=True, padx=10, pady=10)
+
+            card = tk.Frame(
+                container,
+                bg="#FDF7EA",
+                bd=1,
+                relief="solid",
+                padx=10,
+                pady=10,
+            )
+            card.pack(fill="both", expand=True)
+
+            canvas_d = tk.Canvas(card, bg="#FDF7EA", highlightthickness=0)
+            canvas_d.pack(side="left", fill="both", expand=True)
+
+            scrollbar_d = ttk.Scrollbar(card, orient="vertical", command=canvas_d.yview)
+            scrollbar_d.pack(side="right", fill="y")
+
+            canvas_d.configure(yscrollcommand=scrollbar_d.set)
+
+            content = tk.Frame(canvas_d, bg="#FDF7EA")
+            canvas_d.create_window((0, 0), window=content, anchor="nw")
+
+            def on_configure(event):
+                canvas_d.configure(scrollregion=canvas_d.bbox("all"))
+
+            content.bind("<Configure>", on_configure)
+
+            tk.Label(
+                content,
+                text=f"Cliente: {safe(n1)} {safe(a1)}",
+                bg="#FDF7EA",
+                fg="#333333",
+                font=("Segoe UI", 12, "bold"),
+            ).grid(row=0, column=0, columnspan=2, pady=(5, 5), padx=5, sticky="w")
+
+            ttk.Separator(content, orient="horizontal").grid(
+                row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 8)
+            )
+
+            datos = [
+                ("ID Cliente", safe(id_cliente)),
+                ("Número de Mesa", safe(mesa)),
+                ("Nombre1", safe(n1)),
+                ("Nombre2", safe(n2)),
+                ("Apellido1", safe(a1)),
+                ("Apellido2", safe(a2)),
+                ("Teléfono", safe(tel)),
+            ]
+
+            for i, (label_txt, valor) in enumerate(datos, start=2):
+                tk.Label(
+                    content,
+                    text=label_txt + ":",
+                    bg="#FDF7EA",
+                    fg="#6A4E23",
+                    font=("Segoe UI", 10, "bold"),
+                ).grid(row=i, column=0, sticky="w", padx=10, pady=3)
+
+                tk.Label(
+                    content,
+                    text=str(valor),
+                    bg="#FDF7EA",
+                    fg="#222222",
+                    font=("Segoe UI", 10),
+                ).grid(row=i, column=1, sticky="w", padx=5, pady=3)
+
+            last_row = len(datos) + 2
+
+            ttk.Separator(content, orient="horizontal").grid(
+                row=last_row, column=0, columnspan=2, sticky="ew", padx=5, pady=(8, 5)
+            )
+
+            # ----- botón EDITAR (rellena formulario de la izquierda) -----
+            def preparar_edicion():
+                entries["Número de Mesa"].delete(0, tk.END)
+                entries["Número de Mesa"].insert(
+                    0, "" if safe(mesa) == "—" else mesa
+                )
+
+                entries["Nombre1"].delete(0, tk.END)
+                entries["Nombre1"].insert(0, "" if safe(n1) == "—" else n1)
+
+                entries["Nombre2"].delete(0, tk.END)
+                entries["Nombre2"].insert(0, "" if safe(n2) == "—" else n2)
+
+                entries["Apellido1"].delete(0, tk.END)
+                entries["Apellido1"].insert(0, "" if safe(a1) == "—" else a1)
+
+                entries["Apellido2"].delete(0, tk.END)
+                entries["Apellido2"].insert(0, "" if safe(a2) == "—" else a2)
+
+                entries["Teléfono"].delete(0, tk.END)
+                entries["Teléfono"].insert(0, "" if safe(tel) == "—" else tel)
+
+                detalle.destroy()
+
+            btn_editar_detalle = ttk.Button(
+                content, text="Editar este cliente", command=preparar_edicion
+            )
+            btn_editar_detalle.grid(
+                row=last_row + 1, column=0, padx=10, pady=(5, 10), sticky="w"
+            )
+
+            btn_cerrar = ttk.Button(content, text="Cerrar", command=detalle.destroy)
+            btn_cerrar.grid(
+                row=last_row + 1, column=1, padx=10, pady=(5, 10), sticky="e"
+            )
+
+            detalle.transient(self)
+            detalle.grab_set()
+
+        # doble clic → abrir detalle
+        tree.bind("<Double-1>", mostrar_detalle_cliente)
+
         # ---------- ASIGNAR BOTONES ----------
         btn_agregar.config(command=agregar_cliente)
         btn_eliminar.config(command=eliminar_cliente)
         btn_limpiar.config(command=limpiar_campos)
-        btn_editar.config(command=editar_cliente)
+        btn_editar.config(text="Guardar cambios", command=editar_cliente)
 
         # ---------- Cargar datos al inicio ----------
         cargar_clientes()
+
 
     # ---------------- ---------------------------TAB VENTAS ----------------
     def _create_tab_ventas(self, notebook):
