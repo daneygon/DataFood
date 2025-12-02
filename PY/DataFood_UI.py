@@ -2828,8 +2828,29 @@ class RestauranteUI(tk.Tk):
             y = (sh // 2) - (wh // 2)
             ventana.geometry(f"{ww}x{wh}+{x}+{y}")
 
-            main = tk.Frame(ventana, bg="#FDF7EA", bd=1, relief="solid")
-            main.pack(fill="both", expand=True, padx=10, pady=10)
+                        # =============================
+            # CONTENEDOR SCROLLABLE
+            # =============================
+            container = tk.Frame(ventana, bg="#F5F1E8")
+            container.pack(fill="both", expand=True, padx=10, pady=10)
+
+            canvas = tk.Canvas(container, bg="#FDF7EA", highlightthickness=0)
+            canvas.pack(side="left", fill="both", expand=True)
+
+            scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+            scrollbar.pack(side="right", fill="y")
+
+            canvas.configure(yscrollcommand=scrollbar.set)
+
+            # Frame real donde van los widgets
+            main = tk.Frame(canvas, bg="#FDF7EA")
+            canvas.create_window((0, 0), window=main, anchor="nw")
+
+            def on_configure(event):
+                canvas.configure(scrollregion=canvas.bbox("all"))
+
+            main.bind("<Configure>", on_configure)
+
 
             row = 0
             tk.Label(main, text="Nueva producción", bg="#FDF7EA",
@@ -2871,25 +2892,57 @@ class RestauranteUI(tk.Tk):
             row += 1
 
             # Imagen
-            tk.Label(main, text="Imagen:", bg="#FDF7EA",
-                     fg="#333333", font=("Segoe UI", 10)
-                     ).grid(row=row, column=0, sticky="e", padx=10, pady=3)
-
-            lbl_imagen_info = tk.Label(
+             # =============================
+# IMAGEN (con vista previa)
+# =============================
+            tk.Label(
                 main,
+                text="Imagen:",
+                bg="#FDF7EA",
+                fg="#333333",
+                font=("Segoe UI", 10)
+            ).grid(row=row, column=0, sticky="e", padx=10, pady=3)
+
+            frame_imagen = tk.Frame(main, bg="#FDF7EA")
+            frame_imagen.grid(row=row, column=1, columnspan=2, sticky="w", padx=10)
+
+            # Aquí se guardará la imagen en bytes
+            imagen_bytes = {"data": None}
+
+            # Texto debajo
+            lbl_imagen_estado = tk.Label(
+                frame_imagen,
                 text="(Sin imagen seleccionada)",
                 bg="#FDF7EA",
                 fg="#777777",
-                font=("Segoe UI", 9, "italic"),
-                anchor="w",
+                font=("Segoe UI", 9, "italic")
             )
-            lbl_imagen_info.grid(row=row + 1, column=1, sticky="w", padx=10, pady=(0, 5))
+            lbl_imagen_estado.pack(anchor="w", pady=(0, 5))
 
-            imagen_bytes = {"data": None}
+            # Vista previa (vacía al inicio)
+            lbl_preview = tk.Label(frame_imagen, bg="#FDF7EA")
+            lbl_preview.pack(anchor="w", pady=(0, 5))
+
+            # ------ FUNCIONES ------
+            from PIL import Image, ImageTk
+            from io import BytesIO
+
+            def mostrar_preview(img_bytes):
+                """Muestra la imagen en lbl_preview."""
+                if not img_bytes:
+                    lbl_preview.config(image="", text="(Sin vista previa)")
+                    lbl_preview.image = None
+                    return
+
+                img = Image.open(BytesIO(img_bytes))
+                img.thumbnail((180, 180))
+                photo = ImageTk.PhotoImage(img)
+
+                lbl_preview.config(image=photo, text="")
+                lbl_preview.image = photo  # evitar garbage collector
 
             def seleccionar_imagen():
                 from tkinter import filedialog
-                import os
 
                 ruta = filedialog.askopenfilename(
                     title="Seleccionar imagen",
@@ -2900,26 +2953,46 @@ class RestauranteUI(tk.Tk):
                 )
                 if not ruta:
                     return
+
                 try:
                     with open(ruta, "rb") as f:
-                        imagen_bytes["data"] = f.read()
-                    lbl_imagen_info.config(text=os.path.basename(ruta), fg="#333333",
-                                           font=("Segoe UI", 9, "normal"))
+                        datos = f.read()
+                    imagen_bytes["data"] = datos
+
+                    lbl_imagen_estado.config(
+                        text=ruta.split("/")[-1], fg="#333333", font=("Segoe UI", 9)
+                    )
+
+                    mostrar_preview(datos)
+
                 except Exception as e:
                     msg.showerror("Error", f"No se pudo leer la imagen:\n{e}")
 
-            btn_sel_imagen = tk.Button(
-                main,
+            # ------ BOTONES: Seleccionar / Cambiar imagen ------
+            btn_sel_img = tk.Button(
+                frame_imagen,
                 text="Seleccionar imagen...",
                 bg="#E5D8B4",
                 fg="#333333",
                 activebackground="#D9C79A",
                 relief="flat",
                 font=("Segoe UI", 9, "bold"),
-                command=seleccionar_imagen,
+                command=seleccionar_imagen
             )
-            btn_sel_imagen.grid(row=row, column=1, columnspan=2,
-                                sticky="w", padx=10, pady=3)
+            btn_sel_img.pack(side="left", padx=(0, 10))
+
+            btn_cambiar_img = tk.Button(
+                frame_imagen,
+                text="Cambiar imagen",
+                bg="#E5D8B4",
+                fg="#333333",
+                activebackground="#D9C79A",
+                relief="flat",
+                font=("Segoe UI", 9, "bold"),
+                command=seleccionar_imagen
+            )
+            btn_cambiar_img.pack(side="left")
+
             row += 2
 
             def actualizar_categorias_nuevo(*_):
@@ -3022,18 +3095,7 @@ class RestauranteUI(tk.Tk):
             ventana.transient(self)
             ventana.grab_set() 
 
-                # ----------------------------------------------------------------------------- 
-        # GESTOR DE CATEGORÍAS (Platos / Bebidas)
-        # ----------------------------------------------------------------------------- 
-                # ------------------------------------------------------------------
-        # VENTANA GESTOR DE CATEGORÍAS (Platos / Bebidas)
-        # ------------------------------------------------------------------
-                # ------------------------------------------------------------------
-        # VENTANA GESTOR DE CATEGORÍAS (Platos / Bebidas)
-        # ------------------------------------------------------------------
-                # ------------------------------------------------------------------
-        # VENTANA GESTOR DE CATEGORÍAS (Platos / Bebidas)
-        # ------------------------------------------------------------------
+           
                 # ------------------------------------------------------------------
         # GESTOR DE CATEGORÍAS (botón "Categorías...")
         # ------------------------------------------------------------------
