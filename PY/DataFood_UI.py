@@ -1620,6 +1620,85 @@ class RestauranteUI(tk.Tk):
         conexion = conectar()
         cursor = conexion.cursor()
 
+
+                # ---------------- Filtros para el TreeView (Producción) ----------------
+        #   - filtro_tipo_tree: None = todos, "Plato" o "Bebida"
+        #   - filtro_texto_tree: texto de búsqueda por nombre
+        filtro_tipo_tree = {"tipo": None}
+        filtro_texto_tree = {"texto": ""}
+
+        # Frame donde está el tree (lo devuelve _create_tab_content)
+        cont_tabla = tree.master
+
+        barra_filtros = tk.Frame(cont_tabla, bg="#FDF7EA")
+        # Lo colocamos por encima del tree
+        barra_filtros.pack(fill="x", padx=2, pady=(0, 3), before=tree)
+
+        tk.Label(
+            barra_filtros,
+            text="Filtro:",
+            bg="#FDF7EA",
+            fg="#333333",
+            font=("Segoe UI", 9, "bold"),
+        ).pack(side="left", padx=(2, 4))
+
+        cmb_filtro_tree = ttk.Combobox(
+            barra_filtros,
+            state="readonly",
+            values=["Todos", "Plato", "Bebida"],
+            width=9,
+        )
+        cmb_filtro_tree.current(0)
+        cmb_filtro_tree.pack(side="left", padx=(0, 8))
+
+        tk.Label(
+            barra_filtros,
+            text="Buscar nombre:",
+            bg="#FDF7EA",
+            fg="#333333",
+            font=("Segoe UI", 9),
+        ).pack(side="left", padx=(0, 4))
+
+        entry_buscar_tree = tk.Entry(barra_filtros, width=18)
+        entry_buscar_tree.pack(side="left", padx=(0, 4))
+#---------------------------busqueda----------------------
+        def aplicar_filtros_tree(*_):
+            # Tipo
+            sel_tipo = cmb_filtro_tree.get()
+            if sel_tipo == "Plato":
+                filtro_tipo_tree["tipo"] = "Plato"
+            elif sel_tipo == "Bebida":
+                filtro_tipo_tree["tipo"] = "Bebida"
+            else:
+                filtro_tipo_tree["tipo"] = None
+
+            # Texto de búsqueda
+            filtro_texto_tree["texto"] = entry_buscar_tree.get().strip().lower()
+            cargar_produccion()
+
+        # Cambiar el combo o presionar ENTER en la búsqueda recarga el tree
+        cmb_filtro_tree.bind("<<ComboboxSelected>>", aplicar_filtros_tree)
+        entry_buscar_tree.bind("<Return>", aplicar_filtros_tree)
+
+        def limpiar_busqueda_tree():
+            entry_buscar_tree.delete(0, tk.END)   # borra el texto
+            filtro_texto_tree["texto"] = ""       # reinicia el filtro
+            cargar_produccion()                   # recarga el Treeview
+
+        # Usa el mismo contenedor donde están cmb_filtro_tree y entry_buscar_tree.
+        # En tu código probablemente se llama algo como 'filtros_tree' o parecido.
+            btn_limpiar_busqueda = tk.Button(
+                barra_filtros,          # <-- pon aquí el frame correcto
+                text="Limpiar",
+                bg="#E5D8B4",
+                fg="#333333",
+                activebackground="#D9C79A",
+                relief="flat",
+                font=("Segoe UI", 8, "bold"),
+                command=limpiar_busqueda_tree,
+            )
+            btn_limpiar_busqueda.pack(side="left", padx=5)
+
         # ---------------- Helpers básicos ----------------
         def limpiar_valor(v):
             if v is None:
@@ -1627,16 +1706,39 @@ class RestauranteUI(tk.Tk):
             v = str(v)
             return v.replace("(", "").replace(")", "").replace(",", "").replace("'", "").strip()
 
-        # ---------------- Cargar cat. desde BD ----------------
-        cursor.execute("SELECT IDCategoriaPlatos, NombreCategoria FROM CategoriaPlatos ORDER BY NombreCategoria;")
-        categorias_platos = cursor.fetchall()
-        cat_platos_nombres = [c[1] for c in categorias_platos]
-        id_cat_plato_por_nombre = {c[1]: c[0] for c in categorias_platos}
+                # ---------------- Cargar categorías desde BD  ----------------
+        cat_platos_nombres = []
+        id_cat_plato_por_nombre = {}
+        cat_bebidas_nombres = []
+        id_cat_bebida_por_nombre = {}
 
-        cursor.execute("SELECT IDCategoriaBebidas, NombreCategoria FROM CategoriaBebidas ORDER BY NombreCategoria;")
-        categorias_bebidas = cursor.fetchall()
-        cat_bebidas_nombres = [c[1] for c in categorias_bebidas]
-        id_cat_bebida_por_nombre = {c[1]: c[0] for c in categorias_bebidas}
+        def recargar_categorias():
+            nonlocal cat_platos_nombres, id_cat_plato_por_nombre
+            nonlocal cat_bebidas_nombres, id_cat_bebida_por_nombre
+
+            # Platos
+            cursor.execute("""
+                SELECT IDCategoriaPlatos, NombreCategoria
+                FROM CategoriaPlatos
+                ORDER BY NombreCategoria;
+            """)
+            filas_platos = cursor.fetchall()
+            cat_platos_nombres = [c[1] for c in filas_platos]
+            id_cat_plato_por_nombre = {c[1]: c[0] for c in filas_platos}
+
+            # Bebidas
+            cursor.execute("""
+                SELECT IDCategoriaBebidas, NombreCategoria
+                FROM CategoriaBebidas
+                ORDER BY NombreCategoria;
+            """)
+            filas_bebidas = cursor.fetchall()
+            cat_bebidas_nombres = [c[1] for c in filas_bebidas]
+            id_cat_bebida_por_nombre = {c[1]: c[0] for c in filas_bebidas}
+
+        # Cargar categorías al iniciar
+        recargar_categorias()
+
 
         # ---------------- Reemplazar entries por combobox ----------------
                 # ------------------------------------------------------------------
@@ -1703,23 +1805,61 @@ class RestauranteUI(tk.Tk):
         )
 
         # ---------------- Funciones de combos ----------------
-        def cargar_nombres():
-            """Rellena el combo de nombres según el tipo."""
-            tipo = cmb_tipo.get()
+                # ---------------- Funciones de combos ----------------
+        def cargar_nombres(*_):
+            """Rellena el combo de nombres según el tipo y la categoría."""
+            tipo = cmb_tipo.get().strip()
+            categoria = cmb_categoria.get().strip()
+
+            # Si es PLATO
             if tipo == "Plato":
-                cursor.execute("""
-                    SELECT DISTINCT NombrePlato
-                    FROM Produccion
-                    WHERE NombrePlato IS NOT NULL
-                    ORDER BY NombrePlato;
-                """)
+                if categoria:
+                    # Filtrar por categoría (MenuDePlatos)
+                    id_cat = id_cat_plato_por_nombre.get(categoria)
+                    if id_cat is None:
+                        cmb_nombre["values"] = ()
+                        cmb_nombre.set("")
+                        return
+                    cursor.execute("""
+                        SELECT DISTINCT P.NombrePlato
+                        FROM Produccion P
+                        INNER JOIN MenuDePlatos MP ON MP.IDProduccion = P.IDProduccion
+                        WHERE P.NombrePlato IS NOT NULL
+                          AND MP.IDCategoriaPlatos = ?
+                        ORDER BY P.NombrePlato;
+                    """, (id_cat,))
+                else:
+                    # Sin categoría seleccionada → todos los platos
+                    cursor.execute("""
+                        SELECT DISTINCT NombrePlato
+                        FROM Produccion
+                        WHERE NombrePlato IS NOT NULL
+                        ORDER BY NombrePlato;
+                    """)
+
+            # Si es BEBIDA
             elif tipo == "Bebida":
-                cursor.execute("""
-                    SELECT DISTINCT NombreBebida
-                    FROM Produccion
-                    WHERE NombreBebida IS NOT NULL
-                    ORDER BY NombreBebida;
-                """)
+                if categoria:
+                    id_cat = id_cat_bebida_por_nombre.get(categoria)
+                    if id_cat is None:
+                        cmb_nombre["values"] = ()
+                        cmb_nombre.set("")
+                        return
+                    cursor.execute("""
+                        SELECT DISTINCT P.NombreBebida
+                        FROM Produccion P
+                        INNER JOIN MenuDeBebidas MB ON MB.IDProduccion = P.IDProduccion
+                        WHERE P.NombreBebida IS NOT NULL
+                          AND MB.IDCategoriaBebidas = ?
+                        ORDER BY P.NombreBebida;
+                    """, (id_cat,))
+                else:
+                    cursor.execute("""
+                        SELECT DISTINCT NombreBebida
+                        FROM Produccion
+                        WHERE NombreBebida IS NOT NULL
+                        ORDER BY NombreBebida;
+                    """)
             else:
                 cmb_nombre["values"] = ()
                 cmb_nombre.set("")
@@ -1733,26 +1873,39 @@ class RestauranteUI(tk.Tk):
                 cmb_nombre.set("")
 
         def actualizar_categorias(*_):
-            tipo = cmb_tipo.get()
+            """Rellena el combo de categorías según el tipo, y limpia nombres."""
+            tipo = cmb_tipo.get().strip()
             if tipo == "Plato":
                 cmb_categoria["values"] = cat_platos_nombres
             elif tipo == "Bebida":
                 cmb_categoria["values"] = cat_bebidas_nombres
             else:
                 cmb_categoria["values"] = ()
-            cmb_categoria.set("")
-            cargar_nombres()
 
+            cmb_categoria.set("")
+            cmb_nombre["values"] = ()
+            cmb_nombre.set("")
+
+                # Cuando cambie el tipo, actualizamos categorías (y luego nombres)
         cmb_tipo.bind("<<ComboboxSelected>>", actualizar_categorias)
+
+        # Cuando cambie la categoría, filtramos los nombres
+        cmb_categoria.bind("<<ComboboxSelected>>", cargar_nombres)
 
         # Valor inicial
         cmb_tipo.set("Plato")
         actualizar_categorias()
 
         # ---------------- Cargar producción en el TreeView ----------------
+                # ---------------- Cargar producción en el TreeView ----------------
         def cargar_produccion():
+            # Limpiar tree
             for fila in tree.get_children():
                 tree.delete(fila)
+
+            # Valores de filtro actuales
+            tipo_filtro = filtro_tipo_tree["tipo"]          # None, "Plato", "Bebida"
+            texto_busqueda = filtro_texto_tree["texto"]     # string en minúsculas
 
             cursor.execute("""
                 SELECT 
@@ -1771,7 +1924,6 @@ class RestauranteUI(tk.Tk):
                         WHEN P.NombrePlato IS NOT NULL THEN ISNULL(P.CostoPorPlato,0)
                         ELSE ISNULL(P.CostoPorBebida,0)
                     END AS CostoUnitario,
-                    -- 👇 Fecha formateada dd/mm/aaaa usando las columnas Dia, Mes, Ano
                     RIGHT('0' + CAST(ISNULL(P.Dia, DAY(GETDATE())) AS VARCHAR(2)), 2) + '/' +
                     RIGHT('0' + CAST(ISNULL(P.Mes, MONTH(GETDATE())) AS VARCHAR(2)), 2) + '/' +
                     CAST(ISNULL(P.Ano, YEAR(GETDATE())) AS VARCHAR(4)) AS Fecha
@@ -1788,8 +1940,20 @@ class RestauranteUI(tk.Tk):
 
             for row in cursor.fetchall():
                 limpio = [limpiar_valor(x) for x in row]
+                tipo = limpio[1]
+                nombre = str(limpio[3]).lower()
+
+                # Filtro por tipo (Plato/Bebida)
+                if tipo_filtro and tipo != tipo_filtro:
+                    continue
+
+                # Filtro por texto de búsqueda (en el nombre)
+                if texto_busqueda and texto_busqueda not in nombre:
+                    continue
+
                 tree.insert("", "end", values=limpio)
 
+            # Mantener actualizado el combo de nombres
             cargar_nombres()
 
         # ---------------- AGREGAR: registrar stock ----------------
@@ -2167,6 +2331,483 @@ class RestauranteUI(tk.Tk):
 
         tree.bind("<Double-1>", mostrar_detalle_produccion)
 
+       
+        # CATÁLOGO: ver  el stock (platos y bebidas) y editar base
+        # ------------------------------------------------------------------
+        def abrir_ventana_stock_completo():
+            win = tk.Toplevel(self)
+            win.title("Stock completo de producción")
+            win.configure(bg="#F5F1E8")
+
+            # Tamaño y centrado
+            ancho, alto = 820, 420
+            win.geometry(f"{ancho}x{alto}")
+            win.update_idletasks()
+            sw = win.winfo_screenwidth()
+            sh = win.winfo_screenheight()
+            x = (sw // 2) - (ancho // 2)
+            y = (sh // 2) - (alto // 2)
+            win.geometry(f"{ancho}x{alto}+{x}+{y}")
+
+            # ---------- Marco principal ----------
+            marco = tk.Frame(win, bg="#FDF7EA", bd=1, relief="solid")
+            marco.pack(fill="both", expand=True, padx=10, pady=10)
+
+            # ---------- Cabecera + filtro ----------
+            top_bar = tk.Frame(marco, bg="#FDF7EA")
+            top_bar.pack(fill="x", pady=(5, 5))
+
+            tk.Label(
+                top_bar,
+                text="Stock completo de producción",
+                bg="#FDF7EA",
+                fg="#333333",
+                font=("Segoe UI", 11, "bold"),
+            ).pack(side="left", padx=(5, 15))
+
+            tk.Label(
+                top_bar,
+                text="Mostrar:",
+                bg="#FDF7EA",
+                fg="#333333",
+                font=("Segoe UI", 9),
+            ).pack(side="left")
+
+            filtro_tipo = {"tipo": None}  # None = todos
+
+            cmb_filtro = ttk.Combobox(
+                top_bar,
+                state="readonly",
+                values=["Todos", "Plato", "Bebida"],
+                width=12,
+            )
+            cmb_filtro.current(0)
+            cmb_filtro.pack(side="left", padx=(5, 0))
+
+            # ---------- Treeview (solo columnas base) ----------
+            columns_stock = ("ID", "Tipo", "Categoría", "Nombre")
+
+            cont_tree = tk.Frame(marco, bg="#FDF7EA")
+            cont_tree.pack(fill="both", expand=True, padx=5, pady=(5, 5))
+
+            tree_stock = ttk.Treeview(
+                cont_tree,
+                columns=columns_stock,
+                show="headings",
+                height=15,
+            )
+
+            # Encabezados
+            tree_stock.heading("ID", text="ID")
+            tree_stock.heading("Tipo", text="Tipo")
+            tree_stock.heading("Categoría", text="Categoría")
+            tree_stock.heading("Nombre", text="Nombre")
+
+            tree_stock.column("ID", width=50, anchor="center")
+            tree_stock.column("Tipo", width=80, anchor="center")
+            tree_stock.column("Categoría", width=150, anchor="w")
+            tree_stock.column("Nombre", width=220, anchor="w")
+
+            vsb = ttk.Scrollbar(
+                cont_tree, orient="vertical", command=tree_stock.yview
+            )
+            tree_stock.configure(yscrollcommand=vsb.set)
+
+            tree_stock.pack(side="left", fill="both", expand=True)
+            vsb.pack(side="right", fill="y")
+
+            # ---------- Cargar datos en el catálogo ----------
+            def cargar_stock():
+                tree_stock.delete(*tree_stock.get_children())
+
+                cursor.execute("""
+                    SELECT 
+                        P.IDProduccion,
+                        CASE 
+                            WHEN P.NombrePlato IS NOT NULL THEN 'Plato'
+                            ELSE 'Bebida'
+                        END AS Tipo,
+                        COALESCE(CP.NombreCategoria, CB.NombreCategoria, '—') AS Categoria,
+                        COALESCE(P.NombrePlato, P.NombreBebida, '—') AS Nombre
+                    FROM Produccion P
+                    LEFT JOIN MenuDePlatos MP ON MP.IDProduccion = P.IDProduccion
+                    LEFT JOIN CategoriaPlatos CP ON CP.IDCategoriaPlatos = MP.IDCategoriaPlatos
+                    LEFT JOIN MenuDeBebidas MB ON MB.IDProduccion = P.IDProduccion
+                    LEFT JOIN CategoriaBebidas CB ON CB.IDCategoriaBebidas = MB.IDCategoriaBebidas
+                    ORDER BY P.IDProduccion;
+                """)
+
+                for row in cursor.fetchall():
+                    idp, tipo, cat, nom = [limpiar_valor(x) for x in row]
+
+                    # aplicar filtro Plato/Bebida
+                    if filtro_tipo["tipo"] and tipo != filtro_tipo["tipo"]:
+                        continue
+
+                    tree_stock.insert(
+                        "", "end", values=(idp, tipo, cat, nom)
+                    )
+
+            def aplicar_filtro(_=None):
+                selec = cmb_filtro.get()
+                if selec == "Plato":
+                    filtro_tipo["tipo"] = "Plato"
+                elif selec == "Bebida":
+                    filtro_tipo["tipo"] = "Bebida"
+                else:
+                    filtro_tipo["tipo"] = None
+                cargar_stock()
+
+            cmb_filtro.bind("<<ComboboxSelected>>", aplicar_filtro)
+
+            # Primera carga
+            cargar_stock()
+
+            # ---------- Detalle / edición desde el catálogo ----------
+            def abrir_detalle_desde_stock(event=None):
+                sel = tree_stock.selection()
+                if not sel:
+                    return
+
+                vals = tree_stock.item(sel)["values"]
+                if not vals:
+                    return
+
+                id_prod, tipo, categoria, nombre = vals
+
+                detalle = tk.Toplevel(win)
+                detalle.title(f"Producción: {tipo} - {nombre}")
+                detalle.configure(bg="#F5F1E8")
+
+                ancho_d, alto_d = 520, 420
+                detalle.geometry(f"{ancho_d}x{alto_d}")
+                detalle.update_idletasks()
+                sw = detalle.winfo_screenwidth()
+                sh = detalle.winfo_screenheight()
+                x = (sw // 2) - (ancho_d // 2)
+                y = (sh // 2) - (alto_d // 2)
+                detalle.geometry(f"{ancho_d}x{alto_d}+{x}+{y}")
+
+                               # ---- Contenedor con scroll ----
+                card = tk.Frame(detalle, bg="#FDF7EA", bd=1, relief="solid")
+                card.pack(fill="both", expand=True, padx=10, pady=10)
+
+                canvas_d = tk.Canvas(card, bg="#FDF7EA", highlightthickness=0)
+                canvas_d.pack(side="left", fill="both", expand=True)
+
+                scrollbar_d = ttk.Scrollbar(card, orient="vertical", command=canvas_d.yview)
+                scrollbar_d.pack(side="right", fill="y")
+
+                canvas_d.configure(yscrollcommand=scrollbar_d.set)
+
+                # Frame real donde van todos los widgets (título, imagen, datos, botones…)
+                marco_d = tk.Frame(canvas_d, bg="#FDF7EA")
+                canvas_d.create_window((0, 0), window=marco_d, anchor="nw")
+
+                def on_configure(event):
+                    canvas_d.configure(scrollregion=canvas_d.bbox("all"))
+
+                marco_d.bind("<Configure>", on_configure)
+
+                # ---- Título ----
+                tk.Label(
+                    marco_d,
+                    text=f"{tipo}: {nombre}",
+                    bg="#FDF7EA",
+                    fg="#333333",
+                    font=("Segoe UI", 12, "bold"),
+                ).pack(fill="x", padx=10, pady=(5, 3))
+
+                ttk.Separator(marco_d, orient="horizontal").pack(
+                    fill="x", padx=10, pady=(0, 8)
+                )
+
+                # ---- Imagen ----
+                frame_img = tk.Frame(marco_d, bg="#FDF7EA")
+                frame_img.pack(pady=(0, 5))
+
+                tk.Label(
+                    frame_img,
+                    text="Imagen actual.",
+                    bg="#FDF7EA",
+                    fg="#777777",
+                    font=("Segoe UI", 9, "italic"),
+                ).pack()
+
+                lbl_img = tk.Label(frame_img, bg="#FDF7EA")
+                lbl_img.pack(pady=(3, 5))
+
+                # Cargar imagen desde BD
+                imagen_actual = {"bytes": None}
+
+                try:
+                    cursor.execute(
+                        "SELECT Imagen FROM Produccion WHERE IDProduccion = ?;",
+                        (id_prod,),
+                    )
+                    row = cursor.fetchone()
+                    img_bytes = row[0] if row and row[0] is not None else None
+                except Exception:
+                    img_bytes = None
+
+                if img_bytes:
+                    from io import BytesIO
+                    from PIL import Image, ImageTk
+
+                    imagen = Image.open(BytesIO(img_bytes))
+                    imagen.thumbnail((220, 220))
+                    photo = ImageTk.PhotoImage(imagen)
+                    lbl_img.configure(image=photo)
+                    lbl_img.image = photo
+                    imagen_actual["bytes"] = img_bytes
+                else:
+                    lbl_img.configure(
+                        text="(Sin imagen asociada)",
+                        fg="#777777",
+                        font=("Segoe UI", 9, "italic"),
+                    )
+
+                # ---- Datos básicos (categoría + nombre) ----
+                datos_frame = tk.LabelFrame(
+                    marco_d,
+                    text="Datos básicos",
+                    bg="#FDF7EA",
+                    fg="#6A4E23",
+                    font=("Segoe UI", 9, "bold"),
+                    labelanchor="nw",
+                )
+                datos_frame.pack(fill="x", padx=10, pady=(5, 10))
+
+                # Categoría
+                tk.Label(
+                    datos_frame,
+                    text="Categoría:",
+                    bg="#FDF7EA",
+                    fg="#333333",
+                    font=("Segoe UI", 9),
+                ).grid(row=0, column=0, sticky="e", padx=5, pady=3)
+
+                cmb_cat = ttk.Combobox(datos_frame, state="readonly")
+                if tipo == "Plato":
+                    cmb_cat["values"] = cat_platos_nombres
+                else:
+                    cmb_cat["values"] = cat_bebidas_nombres
+                cmb_cat.grid(row=0, column=1, sticky="ew", padx=5, pady=3)
+                cmb_cat.columnconfigure(1, weight=1)
+                cmb_cat.set(categoria if categoria != "—" else "")
+
+                # Nombre
+                tk.Label(
+                    datos_frame,
+                    text="Nombre:",
+                    bg="#FDF7EA",
+                    fg="#333333",
+                    font=("Segoe UI", 9),
+                ).grid(row=1, column=0, sticky="e", padx=5, pady=3)
+
+                entry_nombre = tk.Entry(datos_frame)
+                entry_nombre.grid(row=1, column=1, sticky="ew", padx=5, pady=3)
+                entry_nombre.insert(0, nombre)
+
+                datos_frame.columnconfigure(1, weight=1)
+
+                # ---- Botones inferiores ----
+                frame_botones = tk.Frame(marco_d, bg="#FDF7EA")
+                frame_botones.pack(pady=(5, 0))
+
+                def cambiar_imagen():
+                    from tkinter import filedialog
+                    import os
+
+                    ruta = filedialog.askopenfilename(
+                        title="Seleccionar imagen",
+                        filetypes=[
+                            ("Imágenes", "*.png;*.jpg;*.jpeg;*.gif;*.bmp"),
+                            ("Todos los archivos", "*.*"),
+                        ],
+                    )
+                    if not ruta:
+                        return
+                    try:
+                        with open(ruta, "rb") as f:
+                            new_bytes = f.read()
+                        imagen_actual["bytes"] = new_bytes
+
+                        from PIL import Image, ImageTk
+                        from io import BytesIO
+
+                        imagen = Image.open(BytesIO(new_bytes))
+                        imagen.thumbnail((220, 220))
+                        photo = ImageTk.PhotoImage(imagen)
+                        lbl_img.configure(image=photo, text="")
+                        lbl_img.image = photo
+                    except Exception as e:
+                        msg.showerror("Error", f"No se pudo leer la imagen:\n{e}")
+
+                def eliminar_produccion_definitiva():
+                    if not msg.askyesno(
+                        "Eliminar producción",
+                        "¿Seguro que deseas eliminar este plato/bebida del catálogo?\n"
+                        "Esta acción elimina la producción base y su registro en el menú,\n"
+                        "pero no borra los registros históricos de producción ya realizados.",
+                    ):
+                        return
+                    try:
+                        if tipo == "Plato":
+                            cursor.execute(
+                                "DELETE FROM MenuDePlatos WHERE IDProduccion = ?;",
+                                (id_prod,),
+                            )
+                        else:
+                            cursor.execute(
+                                "DELETE FROM MenuDeBebidas WHERE IDProduccion = ?;",
+                                (id_prod,),
+                            )
+
+                        cursor.execute(
+                            "DELETE FROM Produccion WHERE IDProduccion = ?;",
+                            (id_prod,),
+                        )
+
+                        conexion.commit()
+                        msg.showinfo(
+                            "Éxito",
+                            "Producción eliminada del catálogo correctamente.",
+                        )
+
+                        # refrescar todo lo que usa esta producción
+                        cargar_nombres()
+                        cargar_produccion()
+                        cargar_stock()
+
+                        detalle.destroy()
+                    except Exception as e:
+                        msg.showerror(
+                            "Error",
+                            f"No se pudo eliminar la producción:\n{e}",
+                        )
+
+                def guardar_datos_base():
+                    nueva_cat = cmb_cat.get().strip()
+                    nuevo_nombre = entry_nombre.get().strip()
+
+                    if not nuevo_nombre:
+                        return msg.showwarning(
+                            "Atención", "Ingrese un nombre para la producción."
+                        )
+
+                    try:
+                        if tipo == "Plato":
+                            if nueva_cat not in id_cat_plato_por_nombre:
+                                return msg.showerror(
+                                    "Error", "Categoría de plato no encontrada."
+                                )
+                            id_cat = id_cat_plato_por_nombre[nueva_cat]
+
+                            cursor.execute("""
+                                UPDATE Produccion
+                                SET NombrePlato = ?, Imagen = ?
+                                WHERE IDProduccion = ?;
+                            """, (nuevo_nombre, imagen_actual["bytes"], id_prod))
+
+                            cursor.execute("""
+                                UPDATE MenuDePlatos
+                                SET NombrePlato = ?, IDCategoriaPlatos = ?
+                                WHERE IDProduccion = ?;
+                            """, (nuevo_nombre, id_cat, id_prod))
+
+                        else:  # Bebida
+                            if nueva_cat not in id_cat_bebida_por_nombre:
+                                return msg.showerror(
+                                    "Error", "Categoría de bebida no encontrada."
+                                )
+                            id_cat = id_cat_bebida_por_nombre[nueva_cat]
+
+                            cursor.execute("""
+                                UPDATE Produccion
+                                SET NombreBebida = ?, Imagen = ?
+                                WHERE IDProduccion = ?;
+                            """, (nuevo_nombre, imagen_actual["bytes"], id_prod))
+
+                            cursor.execute("""
+                                UPDATE MenuDeBebidas
+                                SET NombreBebida = ?, IDCategoriaBebidas = ?
+                                WHERE IDProduccion = ?;
+                            """, (nuevo_nombre, id_cat, id_prod))
+
+                        conexion.commit()
+                        msg.showinfo("Éxito", "Datos base actualizados correctamente.")
+
+                        # refrescar vistas/combos
+                        cargar_nombres()
+                        cargar_produccion()
+                        cargar_stock()
+
+                        detalle.destroy()
+                    except Exception as e:
+                        msg.showerror(
+                            "Error",
+                            f"No se pudieron guardar los cambios:\n{e}",
+                        )
+
+                btn_cambiar_img = tk.Button(
+                    frame_botones,
+                    text="Cambiar imagen",
+                    bg="#E5D8B4",
+                    fg="#333333",
+                    activebackground="#D9C79A",
+                    relief="flat",
+                    font=("Segoe UI", 9, "bold"),
+                    command=cambiar_imagen,
+                )
+                btn_cambiar_img.grid(row=0, column=0, padx=5, pady=5)
+
+                # 👉 AHORA este botón ELIMINA la producción
+                btn_eliminar = tk.Button(
+                    frame_botones,
+                    text="Eliminar producción",
+                    bg="#F2B6B6",
+                    fg="#333333",
+                    activebackground="#E59A9A",
+                    relief="flat",
+                    font=("Segoe UI", 9, "bold"),
+                    command=eliminar_produccion_definitiva,
+                )
+                btn_eliminar.grid(row=0, column=1, padx=5, pady=5)
+
+                btn_guardar = tk.Button(
+                    frame_botones,
+                    text="Guardar datos",
+                    bg="#CFE5C8",
+                    fg="#333333",
+                    activebackground="#B5D7AA",
+                    relief="flat",
+                    font=("Segoe UI", 9, "bold"),
+                    command=guardar_datos_base,
+                )
+                btn_guardar.grid(row=0, column=2, padx=5, pady=5)
+
+                btn_cerrar = tk.Button(
+                    frame_botones,
+                    text="Cerrar",
+                    bg="#E5D8B4",
+                    fg="#333333",
+                    activebackground="#D9C79A",
+                    relief="flat",
+                    font=("Segoe UI", 9, "bold"),
+                    command=detalle.destroy,
+                )
+                btn_cerrar.grid(row=0, column=3, padx=5, pady=5)
+
+                detalle.transient(win)
+                detalle.grab_set()
+
+            tree_stock.bind("<Double-1>", abrir_detalle_desde_stock)
+
+            win.transient(self)
+            win.grab_set()
+
+
 
         # ----------------------------------------------------------------------------- VENTANA "AGREGAR NUEVO" ----------------
         def abrir_ventana_nueva_produccion():
@@ -2298,9 +2939,12 @@ class RestauranteUI(tk.Tk):
             # Botones guardar / cancelar
             btn_cancelar = ttk.Button(main, text="Cancelar", command=ventana.destroy)
             btn_guardar = ttk.Button(main, text="Guardar")
-
+           
+            # fila de botones: [Ver stock] [Cancelar] [Guardar]
+           
             btn_cancelar.grid(row=row, column=1, sticky="e", padx=10, pady=(8, 10))
             btn_guardar.grid(row=row, column=2, sticky="w", padx=10, pady=(8, 10))
+
 
             def guardar_nueva_produccion():
                 try:
@@ -2376,7 +3020,407 @@ class RestauranteUI(tk.Tk):
             btn_guardar.config(command=guardar_nueva_produccion)
 
             ventana.transient(self)
-            ventana.grab_set()
+            ventana.grab_set() 
+
+                # ----------------------------------------------------------------------------- 
+        # GESTOR DE CATEGORÍAS (Platos / Bebidas)
+        # ----------------------------------------------------------------------------- 
+                # ------------------------------------------------------------------
+        # VENTANA GESTOR DE CATEGORÍAS (Platos / Bebidas)
+        # ------------------------------------------------------------------
+                # ------------------------------------------------------------------
+        # VENTANA GESTOR DE CATEGORÍAS (Platos / Bebidas)
+        # ------------------------------------------------------------------
+                # ------------------------------------------------------------------
+        # VENTANA GESTOR DE CATEGORÍAS (Platos / Bebidas)
+        # ------------------------------------------------------------------
+                # ------------------------------------------------------------------
+        # GESTOR DE CATEGORÍAS (botón "Categorías...")
+        # ------------------------------------------------------------------
+        def abrir_gestor_categorias():
+            win = tk.Toplevel(self)
+            win.title("Gestor de categorías")
+            win.configure(bg="#F5F1E8")
+            win.geometry("520x360")
+
+            win.update_idletasks()
+            sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+            ww, wh = win.winfo_width(), win.winfo_height()
+            x = (sw // 2) - (ww // 2)
+            y = (sh // 2) - (wh // 2)
+            win.geometry(f"{ww}x{wh}+{x}+{y}")
+
+            cont = tk.Frame(win, bg="#FDF7EA", bd=1, relief="solid")
+            cont.pack(fill="both", expand=True, padx=10, pady=10)
+
+            # ---------------- Encabezado ----------------
+            tk.Label(
+                cont,
+                text="Catálogo de categorías",
+                bg="#FDF7EA",
+                fg="#333333",
+                font=("Segoe UI", 12, "bold"),
+            ).pack(anchor="w", padx=10, pady=(8, 5))
+
+            ttk.Separator(cont, orient="horizontal").pack(
+                fill="x", padx=10, pady=(0, 8)
+            )
+
+            # ---------------- Filtro: Tipo (Plato / Bebida) ----------------
+            top_filtro = tk.Frame(cont, bg="#FDF7EA")
+            top_filtro.pack(fill="x", padx=10, pady=(0, 5))
+
+            tk.Label(
+                top_filtro,
+                text="Mostrar:",
+                bg="#FDF7EA",
+                fg="#333333",
+                font=("Segoe UI", 9, "bold"),
+            ).pack(side="left")
+
+            tipo_var = tk.StringVar(value="Plato")
+            rb_plato = ttk.Radiobutton(
+                top_filtro, text="Platos", variable=tipo_var, value="Plato"
+            )
+            rb_bebida = ttk.Radiobutton(
+                top_filtro, text="Bebidas", variable=tipo_var, value="Bebida"
+            )
+            rb_plato.pack(side="left", padx=5)
+            rb_bebida.pack(side="left", padx=5)
+
+            # ---------------- Treeview de categorías ----------------
+            tabla_frame = tk.Frame(cont, bg="#FDF7EA")
+            tabla_frame.pack(fill="both", expand=True, padx=10, pady=(5, 5))
+
+            cols = ("ID", "Nombre")
+            tree_cat = ttk.Treeview(
+                tabla_frame, columns=cols, show="headings", height=7
+            )
+            tree_cat.pack(side="left", fill="both", expand=True)
+
+            for c in cols:
+                tree_cat.heading(c, text=c)
+            tree_cat.column("ID", width=60, anchor="center")
+            tree_cat.column("Nombre", width=260, anchor="w")
+
+            scroll_cat = ttk.Scrollbar(
+                tabla_frame, orient="vertical", command=tree_cat.yview
+            )
+            scroll_cat.pack(side="right", fill="y")
+            tree_cat.configure(yscrollcommand=scroll_cat.set)
+
+            # ---------------- Formulario edición ----------------
+            form = tk.Frame(cont, bg="#FDF7EA")
+            form.pack(fill="x", padx=10, pady=(5, 5))
+
+            tk.Label(
+                form,
+                text="Nombre categoría:",
+                bg="#FDF7EA",
+                fg="#333333",
+                font=("Segoe UI", 9),
+            ).grid(row=0, column=0, sticky="e", padx=5, pady=3)
+
+            ent_nombre_cat = tk.Entry(form)
+            ent_nombre_cat.grid(row=0, column=1, sticky="ew", padx=5, pady=3)
+            form.columnconfigure(1, weight=1)
+
+            id_cat_seleccionado = {"id": None}
+
+            # --- Helper: refrescar el combo de categorías del panel principal ---
+            def refrescar_combo_panel():
+                """Recarga categorías desde la BD y actualiza:
+                - Listas internas (platos / bebidas)
+                - Diccionarios id->nombre
+                - Combobox de categorías del panel principal (cmb_categoria)
+                """
+                # 1) Recargar categorías de PLATOS desde la BD
+                cursor.execute("""
+                    SELECT IDCategoriaPlatos, NombreCategoria
+                    FROM CategoriaPlatos
+                    ORDER BY NombreCategoria;
+                """)
+                filas_platos = cursor.fetchall()
+                cat_platos_nombres.clear()
+                id_cat_plato_por_nombre.clear()
+                for cid, nom in filas_platos:
+                    cat_platos_nombres.append(nom)
+                    id_cat_plato_por_nombre[nom] = cid
+
+                # 2) Recargar categorías de BEBIDAS desde la BD
+                cursor.execute("""
+                    SELECT IDCategoriaBebidas, NombreCategoria
+                    FROM CategoriaBebidas
+                    ORDER BY NombreCategoria;
+                """)
+                filas_bebidas = cursor.fetchall()
+                cat_bebidas_nombres.clear()
+                id_cat_bebida_por_nombre.clear()
+                for cid, nom in filas_bebidas:
+                    cat_bebidas_nombres.append(nom)
+                    id_cat_bebida_por_nombre[nom] = cid
+
+                # 3) Actualizar el combo del panel principal según su tipo actual
+                tipo_panel = cmb_tipo.get().strip()
+                if tipo_panel == "Plato":
+                    nombres = cat_platos_nombres
+                elif tipo_panel == "Bebida":
+                    nombres = cat_bebidas_nombres
+                else:
+                    nombres = []
+
+                cmb_categoria["values"] = nombres
+
+                # Mantener selección si sigue existiendo
+                actual = cmb_categoria.get()
+                if actual in nombres:
+                    cmb_categoria.set(actual)
+                elif nombres:
+                    cmb_categoria.set(nombres[0])
+                else:
+                    cmb_categoria.set("")
+
+            # ---------------- Funciones internas ----------------
+            def limpiar_form():
+                id_cat_seleccionado["id"] = None
+                ent_nombre_cat.delete(0, tk.END)
+
+            def cargar_tabla_local():
+                """Carga en el Treeview las categorías según el tipo seleccionado."""
+                # Limpiar tabla
+                for item in tree_cat.get_children():
+                    tree_cat.delete(item)
+
+                tipo = tipo_var.get()
+                if tipo == "Plato":
+                    cursor.execute(
+                        """
+                        SELECT IDCategoriaPlatos, NombreCategoria
+                        FROM CategoriaPlatos
+                        ORDER BY NombreCategoria;
+                        """
+                    )
+                else:  # Bebida
+                    cursor.execute(
+                        """
+                        SELECT IDCategoriaBebidas, NombreCategoria
+                        FROM CategoriaBebidas
+                        ORDER BY NombreCategoria;
+                        """
+                    )
+
+                for id_cat, nombre_cat in cursor.fetchall():
+                    tree_cat.insert("", "end", values=(id_cat, nombre_cat))
+
+                limpiar_form()
+
+            def on_select_cat(event=None):
+                sel = tree_cat.selection()
+                if not sel:
+                    return
+
+                vals = tree_cat.item(sel[0])["values"]
+                if not vals or len(vals) < 2:
+                    return
+
+                id_cat_raw, nombre_cat = vals[0], vals[1]
+
+                try:
+                    id_cat = int(id_cat_raw)
+                except (TypeError, ValueError):
+                    id_cat = int(
+                        str(id_cat_raw)
+                        .replace("(", "")
+                        .replace(")", "")
+                        .replace(",", "")
+                        .strip()
+                    )
+
+                id_cat_seleccionado["id"] = id_cat
+
+                ent_nombre_cat.delete(0, tk.END)
+                ent_nombre_cat.insert(0, str(nombre_cat))
+
+            tree_cat.bind("<<TreeviewSelect>>", on_select_cat)
+
+            def obtener_id_categoria_seleccionada():
+                sel = tree_cat.selection()
+                if not sel:
+                    return None, None
+
+                vals = tree_cat.item(sel[0])["values"]
+                if not vals or len(vals) < 2:
+                    return None, None
+
+                try:
+                    id_cat = int(vals[0])
+                except (TypeError, ValueError):
+                    id_cat = int(
+                        str(vals[0])
+                        .replace("(", "")
+                        .replace(")", "")
+                        .replace(",", "")
+                        .strip()
+                    )
+
+                nombre_cat = vals[1]
+                return id_cat, nombre_cat
+
+            def agregar_categoria():
+                nombre = ent_nombre_cat.get().strip()
+                if not nombre:
+                    return msg.showwarning(
+                        "Atención", "Ingrese el nombre de la categoría."
+                    )
+
+                tipo = tipo_var.get()
+                try:
+                    if tipo == "Plato":
+                        cursor.execute(
+                            "INSERT INTO CategoriaPlatos (NombreCategoria) VALUES (?);",
+                            (nombre,),
+                        )
+                    else:
+                        cursor.execute(
+                            "INSERT INTO CategoriaBebidas (NombreCategoria) VALUES (?);",
+                            (nombre,),
+                        )
+
+                    conexion.commit()
+                    cargar_tabla_local()
+                    refrescar_combo_panel()
+                    msg.showinfo("Éxito", "Categoría agregada correctamente.")
+                except Exception as e:
+                    msg.showerror("Error", f"No se pudo agregar la categoría:\n{e}")
+
+            def guardar_categoria():
+                """Editar el nombre de la categoría seleccionada."""
+                id_cat, _ = obtener_id_categoria_seleccionada()
+                if id_cat is None:
+                    return msg.showwarning(
+                        "Atención", "Seleccione una categoría para editar."
+                    )
+
+                nombre_nuevo = ent_nombre_cat.get().strip()
+                if not nombre_nuevo:
+                    return msg.showwarning(
+                        "Atención", "Ingrese el nombre de la categoría."
+                    )
+
+                try:
+                    if tipo_var.get() == "Plato":
+                        cursor.execute(
+                            """
+                            UPDATE CategoriaPlatos
+                            SET NombreCategoria = ?
+                            WHERE IDCategoriaPlatos = ?;
+                            """,
+                            (nombre_nuevo, id_cat),
+                        )
+                    else:  # Bebida
+                        cursor.execute(
+                            """
+                            UPDATE CategoriaBebidas
+                            SET NombreCategoria = ?
+                            WHERE IDCategoriaBebidas = ?;
+                            """,
+                            (nombre_nuevo, id_cat),
+                        )
+
+                    conexion.commit()
+                    msg.showinfo("Éxito", "Categoría actualizada correctamente.")
+                    cargar_tabla_local()
+                    refrescar_combo_panel()
+                except Exception as e:
+                    msg.showerror("Error", f"No se pudo actualizar la categoría:\n{e}")
+
+            def eliminar_categoria():
+                """Eliminar la categoría seleccionada."""
+                id_cat, nombre_cat = obtener_id_categoria_seleccionada()
+                if id_cat is None:
+                    return msg.showwarning(
+                        "Atención", "Seleccione una categoría para eliminar."
+                    )
+
+                if not msg.askyesno(
+                    "Confirmar",
+                    f"¿Seguro que desea eliminar la categoría '{nombre_cat}'?",
+                ):
+                    return
+
+                try:
+                    if tipo_var.get() == "Plato":
+                        cursor.execute(
+                            "DELETE FROM CategoriaPlatos WHERE IDCategoriaPlatos = ?;",
+                            (id_cat,),
+                        )
+                    else:  # Bebida
+                        cursor.execute(
+                            "DELETE FROM CategoriaBebidas WHERE IDCategoriaBebidas = ?;",
+                            (id_cat,),
+                        )
+
+                    conexion.commit()
+                    msg.showinfo("Éxito", "Categoría eliminada correctamente.")
+                    cargar_tabla_local()
+                    refrescar_combo_panel()
+                except Exception as e:
+                    msg.showerror(
+                        "Error",
+                        "No se pudo eliminar la categoría.\n"
+                        "Es posible que esté siendo usada por algún plato/bebida.\n\n"
+                        f"Detalle técnico:\n{e}",
+                    )
+
+            # ---------------- Botones inferiores ----------------
+            botones = tk.Frame(cont, bg="#FDF7EA")
+            botones.pack(fill="x", padx=10, pady=(5, 5))
+
+            btn_agregar_cat = tk.Button(
+                botones,
+                text="Agregar",
+                bg="#E5D8B4",
+                fg="#333333",
+                activebackground="#D9C79A",
+                relief="flat",
+                font=("Segoe UI", 9, "bold"),
+                command=agregar_categoria,
+            )
+            btn_agregar_cat.pack(side="left", padx=5)
+
+            btn_guardar_cat = tk.Button(
+                botones,
+                text="Guardar cambios",
+                bg="#E5D8B4",
+                fg="#333333",
+                activebackground="#D9C79A",
+                relief="flat",
+                font=("Segoe UI", 9, "bold"),
+                command=guardar_categoria,
+            )
+            btn_guardar_cat.pack(side="left", padx=5)
+
+            btn_eliminar_cat = tk.Button(
+                botones,
+                text="Eliminar",
+                bg="#E5D8B4",
+                fg="#333333",
+                activebackground="#D7C18A",
+                relief="flat",
+                font=("Segoe UI", 9, "bold"),
+                command=eliminar_categoria,
+            )
+            btn_eliminar_cat.pack(side="left", padx=5)
+
+            # Cambio de tipo actualiza tabla
+            def on_cambiar_tipo(*_):
+                cargar_tabla_local()
+
+            tipo_var.trace_add("write", lambda *args: on_cambiar_tipo())
+
+            cargar_tabla_local()
+            win.transient(self)
+            win.grab_set()
 
         # ---------------- Botón "Agregar nuevo" debajo de los otros ----------------
         parent_botones = btn_agregar.master
@@ -2391,6 +3435,32 @@ class RestauranteUI(tk.Tk):
             command=abrir_ventana_nueva_produccion,
         )
         btn_agregar_nuevo.pack(fill="x", pady=(5, 0))
+
+
+        btn_ver_stock = tk.Button(
+            parent_botones,
+            text="Ver stock completo",
+            bg="#E5D8B4",
+            fg="#333333",
+            activebackground="#D9C79A",
+            relief="flat",
+            font=("Segoe UI", 9, "bold"),
+            command=abrir_ventana_stock_completo,   # usa la función que ya tienes
+        )
+        btn_ver_stock.pack(fill="x", pady=(3, 0))
+
+         # 🔹 Nuevo botón: gestor de categorías
+        btn_categorias = tk.Button(
+            parent_botones,
+            text="Categorías...",
+            bg="#E5D8B4",
+            fg="#333333",
+            activebackground="#D9C79A",
+            relief="flat",
+            font=("Segoe UI", 9, "bold"),
+            command=abrir_gestor_categorias,
+        )
+        btn_categorias.pack(fill="x", pady=(5, 0))
 
         # ---------------- Asignar comandos CRUD ----------------
         btn_agregar.config(command=agregar_produccion)
