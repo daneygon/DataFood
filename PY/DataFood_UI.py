@@ -1134,207 +1134,181 @@ class RestauranteUI(tk.Tk):
                 win = tk.Toplevel(self)
                 win.title("Categorías de Insumos")
                 win.configure(bg="#F5F1E8")
-                win.geometry("480x340")
+                win.geometry("420x340")
 
-                win.update_idletasks()
-                sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
-                ww, wh = win.winfo_width(), win.winfo_height()
-                x = (sw // 2) - (ww // 2)
-                y = (sh // 2) - (wh // 2)
-                win.geometry(f"{ww}x{wh}+{x}+{y}")
+                # Marco principal
+                marco = tk.Frame(win, bg="#FDF7EA", bd=1, relief="solid")
+                marco.pack(fill="both", expand=True, padx=10, pady=10)
 
-                cont = tk.Frame(win, bg="#FDF7EA", bd=1, relief="solid")
-                cont.pack(fill="both", expand=True, padx=10, pady=10)
-
-                # -------------------- TÍTULO --------------------
                 tk.Label(
-                    cont,
-                    text="Catálogo de Categorías de Insumos",
+                    marco,
+                    text="Gestión de categorías de insumos",
                     bg="#FDF7EA",
                     fg="#333333",
                     font=("Segoe UI", 12, "bold"),
-                ).pack(anchor="w", padx=10, pady=(8, 5))
+                ).pack(pady=(5, 5))
 
-                ttk.Separator(cont).pack(fill="x", padx=10, pady=(0, 8))
+                ttk.Separator(marco).pack(fill="x", pady=5)
 
-                # -------------------- TABLA --------------------
-                frame_tabla = tk.Frame(cont, bg="#FDF7EA")
-                frame_tabla.pack(fill="both", expand=True, padx=10, pady=5)
+                # Lista
+                tree_cat = ttk.Treeview(
+                    marco,
+                    columns=("ID", "Nombre"),
+                    show="headings",
+                    height=10
+                )
+                tree_cat.pack(fill="both", expand=True)
 
-                cols = ("ID", "Nombre")
-                tree_cat = ttk.Treeview(frame_tabla, columns=cols, show="headings", height=7)
-                tree_cat.pack(side="left", fill="both", expand=True)
-
-                for c in cols:
-                    tree_cat.heading(c, text=c)
+                tree_cat.heading("ID", text="ID")
+                tree_cat.heading("Nombre", text="Nombre")
 
                 tree_cat.column("ID", width=60, anchor="center")
-                tree_cat.column("Nombre", width=220, anchor="w")
+                tree_cat.column("Nombre", width=240, anchor="w")
 
-                scroll_cat = ttk.Scrollbar(frame_tabla, orient="vertical", command=tree_cat.yview)
-                tree_cat.configure(yscrollcommand=scroll_cat.set)
-                scroll_cat.pack(side="right", fill="y")
+                # Scroll
+                scroll = ttk.Scrollbar(marco, orient="vertical", command=tree_cat.yview)
+                scroll.pack(side="right", fill="y")
+                tree_cat.configure(yscrollcommand=scroll.set)
 
-                # -------------------- FORMULARIO --------------------
-                form = tk.Frame(cont, bg="#FDF7EA")
-                form.pack(fill="x", padx=10, pady=5)
-
-                tk.Label(
-                    form,
-                    text="Nombre categoría:",
-                    bg="#FDF7EA",
-                    fg="#333333",
-                    font=("Segoe UI", 9),
-                ).grid(row=0, column=0, sticky="e", padx=5, pady=3)
-
-                ent_nombre = tk.Entry(form)
-                ent_nombre.grid(row=0, column=1, sticky="ew", padx=5, pady=3)
-                form.columnconfigure(1, weight=1)
-
-                categoria_sel = {"id": None}
-
-                # ========================= CARGAR TABLA =============================
-                conexion = conectar()
-                cursor = conexion.cursor()
-
-                def cargar_tabla():
+                # Cargar categorías
+                def cargar_cat_insumos():
                     tree_cat.delete(*tree_cat.get_children())
-                    cursor.execute("""
-                        SELECT IDCategoriaInsumos, NombreCategoria
-                        FROM CategoriaInsumos
-                        ORDER BY NombreCategoria;
-                    """)
-                    for idc, nombre in cursor.fetchall():
-                        tree_cat.insert("", "end", values=(idc, nombre))
+                    cursor.execute("SELECT IDCategoriaInsumos, NombreCategoria FROM CategoriaInsumos ORDER BY NombreCategoria;")
+                    for cid, nom in cursor.fetchall():
+                        tree_cat.insert("", "end", values=(cid, nom))
 
-                cargar_tabla()
+                cargar_cat_insumos()
 
-                # ========================= SELECCIÓN =============================
-                def on_select_cat(event=None):
+                # ---- Campo para edición/agregar ----
+                entry_nombre = tk.Entry(marco)
+                entry_nombre.pack(fill="x", padx=10, pady=(10, 5))
+
+                # ---- BOTONES ----
+                frame_btns = tk.Frame(marco, bg="#FDF7EA")
+                frame_btns.pack(pady=5)
+
+                # AGREGAR
+                def agregar_categoria():
+                    nombre = entry_nombre.get().strip()
+                    if not nombre:
+                        return msg.showwarning("Atención", "Ingrese un nombre de categoría.")
+
+                    cursor.execute(
+                        "INSERT INTO CategoriaInsumos (NombreCategoria) VALUES (?)",
+                        (nombre,)
+                    )
+                    conexion.commit()
+                    cargar_cat_insumos()
+                    cargar_insumos()      # refrescar panel principal
+                    entry_nombre.delete(0, tk.END)
+
+                # EDITAR
+                def editar_categoria():
                     sel = tree_cat.selection()
                     if not sel:
-                        return
+                        return msg.showwarning("Atención", "Seleccione una categoría.")
 
-                    idc, nombre = tree_cat.item(sel)["values"]
-                    categoria_sel["id"] = idc
-                    ent_nombre.delete(0, tk.END)
-                    ent_nombre.insert(0, nombre)
+                    cid, _ = tree_cat.item(sel)["values"]
+                    nombre = entry_nombre.get().strip()
 
-                tree_cat.bind("<<TreeviewSelect>>", on_select_cat)
-
-                # ========================= CRUD =============================
-
-                def refrescar_combos_principales():
-                    """Actualiza todos los combos de categoría del CRUD Insumos."""
-                    cursor.execute("SELECT NombreCategoria FROM CategoriaInsumos ORDER BY NombreCategoria;")
-                    lista = [r[0] for r in cursor.fetchall()]
-
-                    # Combo del formulario
-                    entries["Categoría"]["values"] = lista
-
-                    # Combo del filtro
-                    cmb_filtro_cat["values"] = ["Todas"] + lista
-
-                    # Ventana "nuevo insumo"
-                    nonlocal nombres_categorias_ins
-                    nombres_categorias_ins = lista
-
-                def agregar_cat():
-                    nombre = ent_nombre.get().strip()
                     if not nombre:
-                        return msg.showwarning("Atención", "Ingrese el nombre de la categoría.")
+                        return msg.showwarning("Atención", "Ingrese un nombre.")
 
-                    try:
-                        cursor.execute(
-                            "INSERT INTO CategoriaInsumos (NombreCategoria) VALUES (?);",
-                            (nombre,)
-                        )
-                        conexion.commit()
-                        cargar_tabla()
-                        refrescar_combos_principales()
-                        ent_nombre.delete(0, tk.END)
-                        msg.showinfo("Éxito", "Categoría agregada.")
-                    except Exception as e:
-                        msg.showerror("Error", f"No se pudo agregar:\n{e}")
+                    cursor.execute(
+                        "UPDATE CategoriaInsumos SET NombreCategoria = ? WHERE IDCategoriaInsumos = ?;",
+                        (nombre, cid)
+                    )
+                    conexion.commit()
+                    cargar_cat_insumos()
+                    cargar_insumos()
 
-                def guardar_cat():
-                    if categoria_sel["id"] is None:
+                # ELIMINAR
+                def eliminar_categoria():
+                    sel = tree_cat.selection()
+                    if not sel:
                         return msg.showwarning("Atención", "Seleccione una categoría.")
 
-                    nuevo = ent_nombre.get().strip()
-                    if not nuevo:
-                        return msg.showwarning("Atención", "Ingrese el nombre.")
+                    cid, nombre = tree_cat.item(sel)["values"]
 
-                    try:
-                        cursor.execute(
-                            "UPDATE CategoriaInsumos SET NombreCategoria=? WHERE IDCategoriaInsumos=?;",
-                            (nuevo, categoria_sel["id"])
-                        )
-                        conexion.commit()
-                        cargar_tabla()
-                        refrescar_combos_principales()
-                        msg.showinfo("Éxito", "Categoría actualizada.")
-                    except Exception as e:
-                        msg.showerror("Error", f"No se pudo editar:\n{e}")
-
-                def eliminar_cat():
-                    if categoria_sel["id"] is None:
-                        return msg.showwarning("Atención", "Seleccione una categoría.")
-
-                    if not msg.askyesno("Confirmar", "¿Eliminar categoría?"):
+                    if not msg.askyesno("Confirmar", f"¿Eliminar la categoría '{nombre}'?"):
                         return
 
-                    try:
-                        cursor.execute(
-                            "DELETE FROM CategoriaInsumos WHERE IDCategoriaInsumos=?;",
-                            (categoria_sel["id"],)
+                    # Eliminar solo si no tiene insumos asignados
+                    cursor.execute("SELECT COUNT(*) FROM Insumos WHERE IDCategoriaInsumos = ?", (cid,))
+                    en_uso = cursor.fetchone()[0]
+
+                    if en_uso > 0:
+                        return msg.showerror(
+                            "Error",
+                            "No se puede eliminar esta categoría porque hay insumos que la utilizan."
                         )
-                        conexion.commit()
-                        cargar_tabla()
-                        refrescar_combos_principales()
-                        ent_nombre.delete(0, tk.END)
-                        categoria_sel["id"] = None
-                        msg.showinfo("Éxito", "Categoría eliminada.")
-                    except Exception as e:
-                        msg.showerror("Error", f"No se pudo eliminar:\n{e}")
 
-                # ========================== BOTONES ==========================
-                botones = tk.Frame(cont, bg="#FDF7EA")
-                botones.pack(fill="x", padx=10, pady=5)
+                    cursor.execute("DELETE FROM CategoriaInsumos WHERE IDCategoriaInsumos = ?", (cid,))
+                    conexion.commit()
+                    cargar_cat_insumos()
+                    cargar_insumos()
 
-                tk.Button(
+                # Botones
+                tk.Button(frame_btns, text="Agregar", bg="#CFE5C8", relief="flat",
+                        command=agregar_categoria).pack(side="left", padx=5)
+
+                tk.Button(frame_btns, text="Editar", bg="#E6D7A8", relief="flat",
+                        command=editar_categoria).pack(side="left", padx=5)
+
+                tk.Button(frame_btns, text="Eliminar", bg="#F2B6B6", relief="flat",
+                        command=eliminar_categoria).pack(side="left", padx=5)
+
+
+                # ---------------- Botones inferiores ----------------
+                botones = tk.Frame(marco, bg="#FDF7EA")
+
+                botones.pack(fill="x", padx=10, pady=(5, 5))
+
+                btn_agregar_cat = tk.Button(
                     botones,
                     text="Agregar",
                     bg="#E5D8B4",
-                    fg="#333",
+                    fg="#333333",
+                    activebackground="#D9C79A",
                     relief="flat",
                     font=("Segoe UI", 9, "bold"),
-                    command=agregar_cat
-                ).pack(side="left", padx=5)
+                    command=agregar_categoria,
+                )
+                btn_agregar_cat.pack(side="left", padx=5)
 
-                tk.Button(
+                btn_guardar_cat = tk.Button(
                     botones,
                     text="Guardar cambios",
                     bg="#E5D8B4",
-                    fg="#333",
+                    fg="#333333",
+                    activebackground="#D9C79A",
                     relief="flat",
                     font=("Segoe UI", 9, "bold"),
-                    command=guardar_cat
-                ).pack(side="left", padx=5)
+                    command=editar_categoria,
+                )
+                btn_guardar_cat.pack(side="left", padx=5)
 
-                tk.Button(
+                btn_eliminar_cat = tk.Button(
                     botones,
                     text="Eliminar",
                     bg="#E5D8B4",
-                    fg="#333",
+                    fg="#333333",
+                    activebackground="#D7C18A",
                     relief="flat",
                     font=("Segoe UI", 9, "bold"),
-                    command=eliminar_cat
-                ).pack(side="left", padx=5)
+                    command=eliminar_categoria,
+                )
+                btn_eliminar_cat.pack(side="left", padx=5)
 
+                # Cambio de tipo actualiza tabla
+                def on_cambiar_tipo(*_):
+                    cargar_tabla_local()
+
+                tipo_var.trace_add("write", lambda *args: on_cambiar_tipo())
+
+                cargar_tabla_local()
                 win.transient(self)
                 win.grab_set()
-
 
 
 
@@ -2203,7 +2177,7 @@ class RestauranteUI(tk.Tk):
         entries, tree, btn_agregar, btn_editar, btn_eliminar, btn_limpiar = self._create_tab_content(
             frame,
             "Registro de Producción",
-            ["Tipo de Producción", "Categoría", "Nombre", "Cantidad", "Costo Unitario"],
+            ["Tipo de Producción", "Categoría", "Nombre", "Cantidad"],
             ["IDProduccion", "Tipo", "Categoría", "Nombre", "Cantidad", "Costo Unitario"]
         )
 
@@ -2270,27 +2244,24 @@ class RestauranteUI(tk.Tk):
         cmb_filtro_tree.bind("<<ComboboxSelected>>", aplicar_filtros_tree)
         entry_buscar_tree.bind("<Return>", aplicar_filtros_tree)
 
-       
         def limpiar_busqueda_tree():
-            entry_buscar_tree.delete(0, tk.END)
-            filtro_texto_tree["texto"] = ""
-            cmb_filtro_tree.set("Todos")
-            filtro_tipo_tree["tipo"] = None
-            cargar_produccion()
+            entry_buscar_tree.delete(0, tk.END)   # borra el texto
+            filtro_texto_tree["texto"] = ""       # reinicia el filtro
+            cargar_produccion()                   # recarga el Treeview
 
-
-        # --- BOTÓN LIMPIAR (corregido) ---
-        btn_limpiar_busqueda = tk.Button(
-            barra_filtros,
-            text="Limpiar",
-            bg="#E5D8B4",
-            fg="#333333",
-            activebackground="#D9C79A",
-            relief="flat",
-            font=("Segoe UI", 8, "bold"),
-            command=limpiar_busqueda_tree
-        )
-        btn_limpiar_busqueda.pack(side="left", padx=5)
+        # Usa el mismo contenedor donde están cmb_filtro_tree y entry_buscar_tree.
+        # En tu código probablemente se llama algo como 'filtros_tree' o parecido.
+            btn_limpiar_busqueda = tk.Button(
+                aplicar_filtros_tree,          # <-- pon aquí el frame correcto
+                text="Limpiar",
+                bg="#E5D8B4",
+                fg="#333333",
+                activebackground="#D9C79A",
+                relief="flat",
+                font=("Segoe UI", 8, "bold"),
+                command=limpiar_busqueda_tree,
+            )
+            btn_limpiar_busqueda.pack(side="left", padx=5)
 
         # ---------------- Helpers básicos ----------------
         def limpiar_valor(v):
@@ -2812,7 +2783,6 @@ class RestauranteUI(tk.Tk):
                 categoria = cmb_categoria.get().strip()
                 nombre = cmb_nombre.get().strip()
                 cant_txt = entries["Cantidad"].get().strip()
-                costo_txt = entries["Costo Unitario"].get().strip()
 
                 if tipo not in ("Plato", "Bebida"):
                     return msg.showwarning("Atención", "Seleccione el tipo de producción.")
@@ -2820,19 +2790,16 @@ class RestauranteUI(tk.Tk):
                     return msg.showwarning("Atención", "Seleccione la categoría.")
                 if not nombre:
                     return msg.showwarning("Atención", "Seleccione el nombre.")
-                if not cant_txt or not costo_txt:
-                    return msg.showwarning("Atención", "Ingrese cantidad y costo unitario.")
+              
 
                 try:
                     cantidad = int(cant_txt)
-                    costo_unit = float(costo_txt)
                 except ValueError:
                     return msg.showwarning("Atención", "Cantidad y costo deben ser numéricos.")
 
                 if cantidad <= 0:
                     return msg.showwarning("Atención", "La cantidad debe ser mayor que cero.")
-                if costo_unit < 0:
-                    return msg.showwarning("Atención", "El costo no puede ser negativo.")
+              
 
                 # Buscar producción base (creada con "Agregar nuevo")
                 if tipo == "Plato":
@@ -2857,24 +2824,20 @@ class RestauranteUI(tk.Tk):
                     cursor.execute("""
                         UPDATE Produccion
                         SET CantidadDePlatos = ISNULL(CantidadDePlatos,0) + ?,
-                            CostoPorPlato = ?,
-                            CostoProduccionTotal = ISNULL(CostoProduccionTotal,0) + (? * ?),
                             Dia = DAY(GETDATE()),
                             Mes = MONTH(GETDATE()),
                             Ano = YEAR(GETDATE())
                         WHERE IDProduccion = ?;
-                    """, (cantidad, costo_unit, cantidad, costo_unit, id_prod))
+                    """, (cantidad, id_prod))
                 else:
                     cursor.execute("""
                         UPDATE Produccion
                         SET CantidadDeBebidas = ISNULL(CantidadDeBebidas,0) + ?,
-                            CostoPorBebida = ?,
-                            CostoProduccionTotal = ISNULL(CostoProduccionTotal,0) + (? * ?),
                             Dia = DAY(GETDATE()),
                             Mes = MONTH(GETDATE()),
                             Ano = YEAR(GETDATE())
                         WHERE IDProduccion = ?;
-                    """, (cantidad, costo_unit, cantidad, costo_unit, id_prod))
+                    """, (cantidad, id_prod))
 
                 conexion.commit()
                 msg.showinfo("Éxito", "Producción registrada correctamente.")
@@ -2899,45 +2862,32 @@ class RestauranteUI(tk.Tk):
                 id_prod = int(limpiar_valor(fila[0]))
                 tipo = fila[1]
 
+                
                 cant_txt = entries["Cantidad"].get().strip()
-                costo_txt = entries["Costo Unitario"].get().strip()
-
-                if not cant_txt or not costo_txt:
-                    return msg.showwarning("Atención", "Ingrese cantidad y costo unitario.")
-
-                try:
-                    cantidad = int(cant_txt)
-                    costo_unit = float(costo_txt)
-                except ValueError:
-                    return msg.showwarning("Atención", "Cantidad y costo deben ser numéricos.")
+                cantidad = int(cant_txt)
 
                 if cantidad < 0:
                     return msg.showwarning("Atención", "La cantidad no puede ser negativa.")
-                if costo_unit < 0:
-                    return msg.showwarning("Atención", "El costo no puede ser negativo.")
+                
 
                 if tipo == "Plato":
                     cursor.execute("""
                         UPDATE Produccion
                         SET CantidadDePlatos = ?,
-                            CostoPorPlato = ?,
-                            CostoProduccionTotal = ? * ?,
                             Dia = DAY(GETDATE()),
                             Mes = MONTH(GETDATE()),
                             Ano = YEAR(GETDATE())
                         WHERE IDProduccion = ?;
-                    """, (cantidad, costo_unit, cantidad, costo_unit, id_prod))
+                    """, (cantidad,  id_prod))
                 else:
                     cursor.execute("""
                         UPDATE Produccion
                         SET CantidadDeBebidas = ?,
-                            CostoPorBebida = ?,
-                            CostoProduccionTotal = ? * ?,
                             Dia = DAY(GETDATE()),
                             Mes = MONTH(GETDATE()),
                             Ano = YEAR(GETDATE())
                         WHERE IDProduccion = ?;
-                    """, (cantidad, costo_unit, cantidad, costo_unit, id_prod))
+                    """, (cantidad, id_prod))
 
                 conexion.commit()
                 msg.showinfo("Éxito", "Producción actualizada correctamente.")
@@ -3459,6 +3409,26 @@ class RestauranteUI(tk.Tk):
 
                 datos_frame.columnconfigure(1, weight=1)
 
+                #precio 
+                # --- Precio venta ---
+                tk.Label(datos_frame, text="Precio venta:", bg="#FDF7EA").grid(row=2, column=0, sticky="e", padx=5, pady=3)
+                entry_precio = tk.Entry(datos_frame)
+                entry_precio.grid(row=2, column=1, sticky="ew", padx=5, pady=3)
+
+                # insertar precio desde BD
+                cursor.execute("""
+                SELECT 
+                    COALESCE(CostoPorPlato, CostoPorBebida, CostoProduccionTotal, 0)
+                FROM Produccion
+                WHERE IDProduccion = ?
+            """, (id_prod,))
+
+                row = cursor.fetchone()
+                if row:
+                    entry_precio.insert(0, str(row[0]))
+
+
+
                 # ---- Botones inferiores ----
                 frame_botones = tk.Frame(marco_d, bg="#FDF7EA")
                 frame_botones.pack(pady=(5, 0))
@@ -3538,6 +3508,35 @@ class RestauranteUI(tk.Tk):
                 def guardar_datos_base():
                     nueva_cat = cmb_cat.get().strip()
                     nuevo_nombre = entry_nombre.get().strip()
+                    nuevo_precio = entry_precio.get().strip()
+
+                   
+                    # --- Guardar precio según tipo ---
+                    if tipo == "Plato":
+                        cursor.execute("""
+                            UPDATE Produccion 
+                            SET CostoPorPlato = ?
+                            WHERE IDProduccion = ?
+                        """, (nuevo_precio, id_prod))
+
+                        cursor.execute("""
+                            UPDATE MenuDePlatos
+                            SET Precio = ?
+                            WHERE IDProduccion = ?
+                        """, (nuevo_precio, id_prod))
+
+                    else:  # Bebida
+                        cursor.execute("""
+                            UPDATE Produccion 
+                            SET CostoPorBebida = ?
+                            WHERE IDProduccion = ?
+                        """, (nuevo_precio, id_prod))
+
+                        cursor.execute("""
+                            UPDATE MenuDeBebidas
+                            SET Precio = ?
+                            WHERE IDProduccion = ?
+                        """, (nuevo_precio, id_prod))
 
                     if not nuevo_nombre:
                         return msg.showwarning(
@@ -3739,6 +3738,19 @@ class RestauranteUI(tk.Tk):
                                   sticky="ew", padx=10, pady=3)
             row += 1
 
+            # --- Precio (tomado del Costo Unitario) ---
+            tk.Label(main, text="Precio venta:", bg="#FDF7EA",
+                        fg="#333333", font=("Segoe UI", 10)
+                        ).grid(row=row, column=0, sticky="e", padx=10, pady=3)
+
+            entry_precio = tk.Entry(main)
+            entry_precio.grid(row=row, column=1, columnspan=2,
+                            sticky="ew", padx=10, pady=3)
+
+            row += 1
+
+
+
             # Imagen
              # =============================
 # IMAGEN (con vista previa)
@@ -3872,7 +3884,9 @@ class RestauranteUI(tk.Tk):
                     tipo_n = cmb_tipo_nuevo.get().strip()
                     categoria_n = cmb_categoria_nuevo.get().strip()
                     nombre_n = txt_nombre_nuevo.get().strip()
+                    precio = entry_precio.get()
                     img_data = imagen_bytes["data"]
+         
 
                     if tipo_n not in ("Plato", "Bebida"):
                         return msg.showwarning("Atención", "Seleccione el tipo de producción.")
@@ -4023,7 +4037,6 @@ class RestauranteUI(tk.Tk):
             bg="#F5F1E8"
         ).pack(pady=20)
 
-        # -------------------------------------  TAB CLIENTES ----------------
 
         # -------------------------------------  TAB CLIENTES ----------------
     def _create_tab_clientes(self, notebook):
