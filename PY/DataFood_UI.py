@@ -26,6 +26,8 @@ def conectar():
 class RestauranteUI(tk.Tk):
     LEFT_PANEL_WIDTH = 260
 
+    # 1. MODIFICAR EL __init__ PARA MANTENER EL PANEL DERECHO
+   # 1. MODIFICAR EL __init__ - PANEL DERECHO MÁS ANCHO
     def __init__(self):
         super().__init__()
 
@@ -109,10 +111,10 @@ class RestauranteUI(tk.Tk):
         )
         gestion_btn.pack(fill="x", padx=15, pady=(10, 5))
 
-        ttk.Button(self.sidebar, text="Pedidos (próximamente)").pack(
+        ttk.Button(self.sidebar, text="Reportes (próximamente)").pack(
             fill="x", padx=15, pady=5
         )
-        ttk.Button(self.sidebar, text="Reportes (próximamente)").pack(
+        ttk.Button(self.sidebar, text="Ajustes (próximamente)").pack(
             fill="x", padx=15, pady=5
         )
 
@@ -120,8 +122,8 @@ class RestauranteUI(tk.Tk):
         self.center_frame = tk.Frame(main_content, bg="#FFFFFF")
         self.center_frame.pack(side="left", fill="both", expand=True, padx=10, pady=5)
 
-        # ------------------ COLUMNA DERECHA (SOLO PARA INICIO) ----------------
-        self.right_panel = tk.Frame(main_content, bg="#F5F1E8", width=260)
+        # ------------------ COLUMNA DERECHA (MÁS ANCHA) ----------------
+        self.right_panel = tk.Frame(main_content, bg="#F5F1E8", width=320)
         self.right_panel.pack(side="left", fill="y")
         self.right_panel.pack_propagate(False)
 
@@ -137,91 +139,666 @@ class RestauranteUI(tk.Tk):
         tk.Label(
             self.right_panel,
             text="no se que poner pero algo voy a poner\n"
-                 "- Detalle del pedido actual\n"
-                 "- Resumen de venta\n"
-                 "- Métodos de pago, etc.",
+                "- Detalle del pedido actual\n"
+                "- Resumen de venta\n"
+                "- Métodos de pago, etc.",
             bg="#F5F1E8",
             fg="#666666",
             font=("Segoe UI", 9),
             justify="left"
-        ).pack(padx=10, pady=5)
+        ).pack(padx=15, pady=5)
 
         # estado de paneles
         self.sidebar_visible = True
-        self.right_panel_visible = True  # <- importante
+        self.right_panel_visible = True
 
-        # al iniciar, mostramos el “Menú de Platos y Bebidas”
+        # Inicializar atributos para el menú
+        self.current_menu_window = None
+        self.canvas_platos = None
+        self.canvas_bebidas = None
+        self.frame_preview_platos = None
+        self.frame_preview_bebidas = None
+        self.btn_left_platos = None
+        self.btn_right_platos = None
+        self.btn_left_bebidas = None
+        self.btn_right_bebidas = None
+
+        # al iniciar, mostramos el "Menú de Platos y Bebidas"
         self._mostrar_dashboard_inicial()
 
-    # ------------------------------------------------------------------
-    # PÁGINA DE INICIO (MENÚ DE PLATOS Y BEBIDAS)
-    # ------------------------------------------------------------------
+        
     def _mostrar_dashboard_inicial(self):
-        """Contenido central por defecto: Menú de Platos y Bebidas."""
-        # Asegurar que el panel derecho esté visible en el INICIO
+        """Muestra el dashboard inicial con menús desplazables"""
+        
+        # Cerrar ventana de menú completo si está abierta
+        if hasattr(self, 'current_menu_window') and self.current_menu_window:
+            try:
+                self.current_menu_window.destroy()
+            except:
+                pass
+            self.current_menu_window = None
+        
+        # Mostrar panel derecho si está oculto
         if not getattr(self, "right_panel_visible", False):
             self.right_panel.pack(side="left", fill="y")
             self.right_panel.pack_propagate(False)
             self.right_panel_visible = True
 
-        # limpiar todo lo que haya en el centro
+        # limpiar contenido central
         for widget in self.center_frame.winfo_children():
             widget.destroy()
 
-        tk.Label(
-            self.center_frame,
-            text="Menú de Platos y Bebidas",
-            bg="#FFFFFF",
-            fg="#333333",
-            font=("Segoe UI", 14, "bold")
-        ).pack(anchor="w", padx=15, pady=(10, 5))
-
-        tk.Label(
-            self.center_frame,
-            text="aqui vas a poner los cruds de los menus\n"
-                 "Esta zona corresponde a donde ves las imágenes de comida en la referencia.",
-            bg="#FFFFFF",
-            fg="#666666",
-            font=("Segoe UI", 10),
-            justify="left"
-        ).pack(anchor="w", padx=15, pady=(0, 10))
-
-        cards_container = tk.Frame(self.center_frame, bg="#FFFFFF")
-        cards_container.pack(fill="both", expand=True, padx=15, pady=10)
-
+        # ====== CONTENEDOR PRINCIPAL CON SCROLL VERTICAL ======
+        # Crear un Canvas con Scrollbar vertical
+        canvas_container = tk.Canvas(self.center_frame, bg="#FFFFFF", highlightthickness=0)
+        canvas_container.pack(side="left", fill="both", expand=True)
+        
+        # Scrollbar VERTICAL para el dashboard
+        v_scrollbar = tk.Scrollbar(
+            self.center_frame, 
+            orient="vertical", 
+            command=canvas_container.yview,
+            width=12,
+            bg="#C8B88A",
+            troughcolor="#F5F1E8"
+        )
+        v_scrollbar.pack(side="right", fill="y")
+        
+        canvas_container.configure(yscrollcommand=v_scrollbar.set)
+        
+        # Frame interior que contendrá TODO el dashboard
+        scrollable_frame = tk.Frame(canvas_container, bg="#FFFFFF")
+        canvas_container.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        
+        def on_configure(event):
+            # Actualizar región de scroll cuando el contenido cambie de tamaño
+            canvas_container.configure(scrollregion=canvas_container.bbox("all"))
+            # Ajustar ancho del canvas
+            canvas_container.config(width=scrollable_frame.winfo_reqwidth())
+        
+        scrollable_frame.bind("<Configure>", on_configure)
+        
+        # ---------------------------------------------------------
+        #                     PLATOS (todo el contenido de antes)
+        # ---------------------------------------------------------
         frame_platos = tk.LabelFrame(
-            cards_container,
+            scrollable_frame,
             text="Menú de Platos",
             bg="#FFFFFF",
             fg="#333333",
-            font=("Segoe UI", 11, "bold")
+            font=("Segoe UI", 12, "bold"),
+            padx=10,
+            pady=10
         )
-        frame_platos.pack(side="top", fill="both", expand=True, pady=(0, 10))
-
+        frame_platos.pack(side="top", fill="x", pady=(0, 20))
+        
         tk.Label(
             frame_platos,
-            text="(Aquí el menu plato )",
+            text="(Vista previa de platos recientes)",
             bg="#FFFFFF",
             fg="#666666",
-            font=("Segoe UI", 9)
-        ).pack(anchor="w", padx=10, pady=5)
-
+            font=("Segoe UI", 9, "italic"),
+        ).pack(anchor="w", padx=5, pady=(0, 10))
+        
+        # --- CONTENEDOR CON FLECHAS Y TARJETAS ---
+        platos_container = tk.Frame(frame_platos, bg="#FFFFFF")
+        platos_container.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # Flecha izquierda
+        self.btn_left_platos = tk.Button(
+            platos_container,
+            text="◀",
+            bg="#C8B88A",
+            fg="#FFFFFF",
+            font=("Segoe UI", 14, "bold"),
+            relief="flat",
+            width=2,
+            height=8
+        )
+        self.btn_left_platos.pack(side="left", fill="y", padx=(15, 5))
+        
+        # Canvas para scroll horizontal (esto es solo para las tarjetas)
+        self.canvas_platos = tk.Canvas(
+            platos_container, 
+            bg="#FFFFFF", 
+            height=200,
+            highlightthickness=0
+        )
+        self.canvas_platos.pack(side="left", fill="both", expand=True)
+        
+        # Frame interior para las tarjetas (solo horizontal)
+        self.frame_preview_platos = tk.Frame(self.canvas_platos, bg="#FFFFFF")
+        self.canvas_platos.create_window((0, 0), window=self.frame_preview_platos, anchor="nw")
+        
+        # Flecha derecha
+        self.btn_right_platos = tk.Button(
+            platos_container,
+            text="▶",
+            bg="#C8B88A",
+            fg="#FFFFFF",
+            font=("Segoe UI", 14, "bold"),
+            relief="flat",
+            width=2,
+            height=8
+        )
+        self.btn_right_platos.pack(side="right", fill="y", padx=(5, 15))
+        
+        # ---------------------------------------------------------
+        #                     BEBIDAS
+        # ---------------------------------------------------------
         frame_bebidas = tk.LabelFrame(
-            cards_container,
+            scrollable_frame,
             text="Menú de Bebidas",
             bg="#FFFFFF",
             fg="#333333",
-            font=("Segoe UI", 11, "bold")
+            font=("Segoe UI", 12, "bold"),
+            padx=10,
+            pady=10
         )
-        frame_bebidas.pack(side="top", fill="both", expand=True)
-
+        frame_bebidas.pack(side="top", fill="x", pady=(0, 20))
+        
         tk.Label(
             frame_bebidas,
-            text="(Aquí poner  una cuadrícula de bebidas con foto, nombre y precio.)",
+            text="(Vista previa de bebidas recientes)",
             bg="#FFFFFF",
             fg="#666666",
-            font=("Segoe UI", 9)
-        ).pack(anchor="w", padx=10, pady=5)
+            font=("Segoe UI", 9, "italic"),
+        ).pack(anchor="w", padx=5, pady=(0, 10))
+        
+        # --- CONTENEDOR CON FLECHAS Y TARJETAS ---
+        bebidas_container = tk.Frame(frame_bebidas, bg="#FFFFFF")
+        bebidas_container.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # Flecha izquierda
+        self.btn_left_bebidas = tk.Button(
+            bebidas_container,
+            text="◀",
+            bg="#C8B88A",
+            fg="#FFFFFF",
+            font=("Segoe UI", 14, "bold"),
+            relief="flat",
+            width=2,
+            height=8
+        )
+        self.btn_left_bebidas.pack(side="left", fill="y", padx=(15, 5))
+        
+        # Canvas para scroll horizontal
+        self.canvas_bebidas = tk.Canvas(
+            bebidas_container, 
+            bg="#FFFFFF", 
+            height=200,
+            highlightthickness=0
+        )
+        self.canvas_bebidas.pack(side="left", fill="both", expand=True)
+        
+        # Frame interior para las tarjetas
+        self.frame_preview_bebidas = tk.Frame(self.canvas_bebidas, bg="#FFFFFF")
+        self.canvas_bebidas.create_window((0, 0), window=self.frame_preview_bebidas, anchor="nw")
+        
+        # Flecha derecha
+        self.btn_right_bebidas = tk.Button(
+            bebidas_container,
+            text="▶",
+            bg="#C8B88A",
+            fg="#FFFFFF",
+            font=("Segoe UI", 14, "bold"),
+            relief="flat",
+            width=2,
+            height=8
+        )
+        self.btn_right_bebidas.pack(side="right", fill="y", padx=(5, 15))
+        
+        # ---------------------------------------------------------
+        # Botones "Ver menú completo" (ESTOS AHORA SERÁN VISIBLES)
+        # ---------------------------------------------------------
+        # Marco para botones
+        btn_container = tk.Frame(scrollable_frame, bg="#E6F2FF", height=70)
+        btn_container.pack(side="top", fill="x", pady=(15, 5))
+        btn_container.pack_propagate(False)
+        
+        # Marco interior para centrar
+        btn_frame = tk.Frame(btn_container, bg="#E6F2FF")
+        btn_frame.place(relx=0.5, rely=0.5, anchor="center")
+        
+        btn_platos = tk.Button(
+            btn_frame,
+            text="📋 Ver menú completo de Platos",
+            bg="#C8B88A",
+            fg="#FFFFFF",
+            relief="flat",
+            font=("Segoe UI", 11, "bold"),
+            padx=25,
+            pady=12,
+            command=lambda: self._abrir_ventana_menu_completo("Plato")
+        )
+        btn_platos.pack(side="left", padx=(0, 20))
+        
+        btn_bebidas = tk.Button(
+            btn_frame,
+            text="🥤 Ver menú completo de Bebidas",
+            bg="#C8B88A",
+            fg="#FFFFFF",
+            relief="flat",
+            font=("Segoe UI", 11, "bold"),
+            padx=25,
+            pady=12,
+            command=lambda: self._abrir_ventana_menu_completo("Bebida")
+        )
+        btn_bebidas.pack(side="left")
+        
+        # ---------------------------------------------------------
+        # Espacio al final para que se vea mejor
+        # ---------------------------------------------------------
+        tk.Frame(scrollable_frame, bg="#FFFFFF", height=20).pack(side="top", fill="x")
+        
+        # ---------------------------------------------------------
+        # Cargar preview de platos y bebidas
+        # ---------------------------------------------------------
+        self._cargar_vista_previa_menu()
+        
+    def _cargar_vista_previa_menu(self):
+        
+        if not self.frame_preview_platos or not self.frame_preview_bebidas:
+            return
+        
+        # Limpiar contenido previo
+        for w in self.frame_preview_platos.winfo_children():
+            w.destroy()
+        for w in self.frame_preview_bebidas.winfo_children():
+            w.destroy()
+
+        conexion = conectar()
+        cursor = conexion.cursor()
+
+        # ============================================================
+        # ---------------------  PREVIEW PLATOS  ----------------------
+        # ============================================================
+        cursor.execute("""
+            SELECT 
+                P.IDProduccion,
+                COALESCE(P.NombrePlato, '—') AS Nombre,
+                COALESCE(CP.NombreCategoria, '—') AS Categoria,
+                ISNULL(P.CostoPorPlato, 0) AS Precio,
+                P.Imagen
+            FROM Produccion P
+            LEFT JOIN MenuDePlatos MP ON MP.IDProduccion = P.IDProduccion
+            LEFT JOIN CategoriaPlatos CP ON CP.IDCategoriaPlatos = MP.IDCategoriaPlatos
+            WHERE P.NombrePlato IS NOT NULL
+            AND ISNULL(P.CantidadDePlatos,0) > 0
+            ORDER BY P.NombrePlato;
+        """)
+        platos = cursor.fetchall()
+
+        # Función para crear tarjeta
+        def crear_tarjeta(parent, idp, nombre, categoria, precio, img_bytes):
+            card = tk.Frame(
+                parent, 
+                bg="#F8F5EE", 
+                bd=2, 
+                relief="ridge",
+                width=220,
+                height=200
+            )
+            card.pack_propagate(False)
+            
+            # CONTENEDOR PARA LA IMAGEN
+            img_container = tk.Frame(card, bg="#FFFFFF", width=100, height=100)
+            img_container.pack(pady=(10, 5))
+            img_container.pack_propagate(False)
+            
+            lbl_img = tk.Label(img_container, bg="#FFFFFF")
+            lbl_img.place(relx=0.5, rely=0.5, anchor="center")
+            
+            if img_bytes:
+                try:
+                    from PIL import Image, ImageTk
+                    from io import BytesIO
+                    img = Image.open(BytesIO(img_bytes))
+                    
+                    img.thumbnail((90, 90), Image.Resampling.LANCZOS)
+                    
+                    if img.size[0] != img.size[1]:
+                        background = Image.new('RGB', (100, 100), color='white')
+                        offset = ((100 - img.size[0]) // 2, (100 - img.size[1]) // 2)
+                        background.paste(img, offset)
+                        img = background
+                    
+                    photo = ImageTk.PhotoImage(img)
+                    lbl_img.config(image=photo)
+                    lbl_img.image = photo
+                except Exception as e:
+                    print(f"Error cargando imagen: {e}")
+                    lbl_img.config(text="🖼️", fg="#999", font=("Segoe UI", 24))
+            else:
+                lbl_img.config(text="📷", fg="#999", font=("Segoe UI", 24))
+            
+            # NOMBRE
+            nombre_display = str(nombre)[:18] + ("..." if len(str(nombre)) > 18 else "")
+            tk.Label(
+                card,
+                text=nombre_display,
+                bg="#F8F5EE",
+                fg="#222222",
+                font=("Segoe UI", 10, "bold"),
+                wraplength=180,
+                justify="center"
+            ).pack(pady=(0, 3))
+            
+            # CATEGORÍA
+            cat_display = str(categoria)[:20] + ("..." if len(str(categoria)) > 20 else "")
+            tk.Label(
+                card,
+                text=cat_display,
+                bg="#F8F5EE",
+                fg="#555555",
+                font=("Segoe UI", 9),
+                wraplength=180,
+                justify="center"
+            ).pack(pady=(0, 5))
+            
+            # PRECIO
+            try:
+                precio_num = float(precio) if precio else 0.0
+                precio_text = f"C$ {precio_num:.2f}"
+            except (ValueError, TypeError):
+                precio_text = "C$ 0.00"
+            
+            precio_frame = tk.Frame(card, bg="#F8F5EE", height=30)
+            precio_frame.pack(fill="x", pady=(5, 10))
+            precio_frame.pack_propagate(False)
+            
+            tk.Label(
+                precio_frame,
+                text=precio_text,
+                bg="#F8F5EE",
+                fg="#157347",
+                font=("Segoe UI", 11, "bold")
+            ).pack(expand=True)
+            
+            return card
+
+        # Crear tarjetas de platos
+        col = 0
+        for idp, nombre, categoria, precio, img_bytes in platos:
+            card = crear_tarjeta(self.frame_preview_platos, idp, nombre, categoria, precio, img_bytes)
+            card.grid(row=0, column=col, padx=12, pady=5, sticky="nw")
+            col += 1
+
+        # ============================================================
+        # ---------------------  PREVIEW BEBIDAS  ---------------------
+        # ============================================================
+        cursor.execute("""
+            SELECT 
+                P.IDProduccion,
+                COALESCE(P.NombreBebida, '—') AS Nombre,
+                COALESCE(CB.NombreCategoria, '—') AS Categoria,
+                ISNULL(P.CostoPorBebida, 0) AS Precio,
+                P.Imagen
+            FROM Produccion P
+            LEFT JOIN MenuDeBebidas MB ON MB.IDProduccion = P.IDProduccion
+            LEFT JOIN CategoriaBebidas CB ON CB.IDCategoriaBebidas = MB.IDCategoriaBebidas
+            WHERE P.NombreBebida IS NOT NULL
+            AND ISNULL(P.CantidadDeBebidas,0) > 0
+            ORDER BY P.NombreBebida;
+        """)
+        bebidas = cursor.fetchall()
+
+        # Crear tarjetas de bebidas
+        col = 0
+        for idp, nombre, categoria, precio, img_bytes in bebidas:
+            card = crear_tarjeta(self.frame_preview_bebidas, idp, nombre, categoria, precio, img_bytes)
+            card.grid(row=0, column=col, padx=12, pady=5, sticky="nw")
+            col += 1
+
+        conexion.close()
+
+        # Configurar scroll después de crear todas las tarjetas
+        self._configurar_scroll()
+
+
+    def _configurar_scroll(self):    
+        def update_scrollregion(canvas, inner_frame):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            inner_frame.update_idletasks()
+            canvas_width = inner_frame.winfo_width()
+            
+            # Configurar canvas width
+            if canvas_width > 600:
+                canvas.config(width=600)
+                
+                # 🔥 ELIMINAR ESTO - NO CREAR SCROLLBAR HORIZONTAL 🔥
+                # Remover scrollbar si existe
+                if hasattr(canvas, 'h_scrollbar') and canvas.h_scrollbar:
+                    canvas.h_scrollbar.destroy()
+                    canvas.h_scrollbar = None
+                canvas.configure(xscrollcommand=lambda *args: None)
+            else:
+                canvas.config(width=canvas_width + 20)
+                # Remover scrollbar si existe
+                if hasattr(canvas, 'h_scrollbar') and canvas.h_scrollbar:
+                    canvas.h_scrollbar.destroy()
+                    canvas.h_scrollbar = None
+                canvas.configure(xscrollcommand=lambda *args: None)
+        
+        # Para platos
+        if self.frame_preview_platos:
+            self.frame_preview_platos.update_idletasks()
+            update_scrollregion(self.canvas_platos, self.frame_preview_platos)
+            
+            def scroll_platos_left():
+                self.canvas_platos.xview_scroll(-3, "units")
+            
+            def scroll_platos_right():
+                self.canvas_platos.xview_scroll(3, "units")
+            
+            if self.btn_left_platos:
+                self.btn_left_platos.config(command=scroll_platos_left)
+            if self.btn_right_platos:
+                self.btn_right_platos.config(command=scroll_platos_right)
+        
+        # Para bebidas
+        if self.frame_preview_bebidas:
+            self.frame_preview_bebidas.update_idletasks()
+            update_scrollregion(self.canvas_bebidas, self.frame_preview_bebidas)
+            
+            def scroll_bebidas_left():
+                self.canvas_bebidas.xview_scroll(-3, "units")
+            
+            def scroll_bebidas_right():
+                self.canvas_bebidas.xview_scroll(3, "units")
+            
+            if self.btn_left_bebidas:
+                self.btn_left_bebidas.config(command=scroll_bebidas_left)
+            if self.btn_right_bebidas:
+                self.btn_right_bebidas.config(command=scroll_bebidas_right)
+
+                
+
+    def _abrir_ventana_menu_completo(self, tipo_menu):
+        """Abre ventana con TODO el menú y oculta el dashboard"""
+        
+        # Cerrar cualquier ventana de menú anterior
+        if hasattr(self, 'current_menu_window') and self.current_menu_window:
+            try:
+                self.current_menu_window.destroy()
+            except:
+                pass
+        
+        # Ocultar panel derecho
+        if getattr(self, "right_panel_visible", False):
+            self.right_panel.pack_forget()
+            self.right_panel_visible = False
+        
+        # Limpiar contenido central
+        for widget in self.center_frame.winfo_children():
+            widget.destroy()
+        
+        # Crear barra superior con flecha para volver
+        top_bar = tk.Frame(self.center_frame, bg="#FFFFFF")
+        top_bar.pack(fill="x", pady=(10, 5))
+        
+        # Flecha para volver al dashboard
+        arrow_btn = tk.Button(
+            top_bar,
+            text="← Volver al Inicio",
+            bg="#FFFFFF",
+            fg="#C8B88A",
+            bd=0,
+            font=("Segoe UI", 11, "bold"),
+            command=self._mostrar_dashboard_inicial
+        )
+        arrow_btn.pack(side="left", padx=(5, 15))
+        
+        # Título
+        titulo = "Menú completo de Platos" if tipo_menu == "Plato" else "Menú completo de Bebidas"
+        tk.Label(
+            top_bar,
+            text=titulo,
+            bg="#FFFFFF",
+            fg="#333333",
+            font=("Segoe UI", 14, "bold")
+        ).pack(side="left", padx=5)
+        
+        # Contenedor para el menú completo
+        cont = tk.Frame(self.center_frame, bg="#F5F1E8")
+        cont.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Canvas con scroll
+        canvas = tk.Canvas(cont, bg="#F5F1E8", highlightthickness=0)
+        canvas.pack(side="left", fill="both", expand=True)
+        
+        vsb = ttk.Scrollbar(cont, orient="vertical", command=canvas.yview)
+        vsb.pack(side="right", fill="y")
+        canvas.configure(yscrollcommand=vsb.set)
+        
+        inner = tk.Frame(canvas, bg="#F5F1E8")
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        
+        def on_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        inner.bind("<Configure>", on_configure)
+        
+        # Cargar datos
+        conexion = conectar()
+        cursor = conexion.cursor()
+        
+        if tipo_menu == "Plato":
+            cursor.execute("""
+                SELECT 
+                    COALESCE(P.NombrePlato, '—') AS Nombre,
+                    COALESCE(CP.NombreCategoria, '—') AS Categoria,
+                    ISNULL(P.CostoPorPlato, 0) AS Precio,
+                    P.Imagen
+                FROM Produccion P
+                LEFT JOIN MenuDePlatos MP ON MP.IDProduccion = P.IDProduccion
+                LEFT JOIN CategoriaPlatos CP ON CP.IDCategoriaPlatos = MP.IDCategoriaPlatos
+                WHERE P.NombrePlato IS NOT NULL
+                    AND ISNULL(P.CantidadDePlatos,0) > 0
+                ORDER BY Categoria, Nombre;
+            """)
+        else:
+            cursor.execute("""
+                SELECT 
+                    COALESCE(P.NombreBebida, '—') AS Nombre,
+                    COALESCE(CB.NombreCategoria, '—') AS Categoria,
+                    ISNULL(P.CostoPorBebida, 0) AS Precio,
+                    P.Imagen
+                FROM Produccion P
+                LEFT JOIN MenuDeBebidas MB ON MB.IDProduccion = P.IDProduccion
+                LEFT JOIN CategoriaBebidas CB ON CB.IDCategoriaBebidas = MB.IDCategoriaBebidas
+                WHERE P.NombreBebida IS NOT NULL
+                    AND ISNULL(P.CantidadDeBebidas,0) > 0
+                ORDER BY Categoria, Nombre;
+            """)
+        
+        filas = cursor.fetchall()
+        
+        # Organizar por categorías
+        categorias = {}
+        for nombre, categoria, precio, img_bytes in filas:
+            if categoria not in categorias:
+                categorias[categoria] = []
+            categorias[categoria].append((nombre, precio, img_bytes))
+        
+        # Mostrar por categorías
+        row_idx = 0
+        for categoria, productos in categorias.items():
+            # Título de categoría
+            cat_frame = tk.LabelFrame(
+                inner,
+                text=f"  {categoria}  ",
+                bg="#FFFFFF",
+                fg="#333333",
+                font=("Segoe UI", 11, "bold"),
+                padx=15,
+                pady=10
+            )
+            cat_frame.grid(row=row_idx, column=0, sticky="ew", padx=10, pady=(0, 15))
+            cat_frame.columnconfigure(0, weight=1)
+            row_idx += 1
+            
+            # Crear grid de productos (4 por fila)
+            productos_frame = tk.Frame(cat_frame, bg="#FFFFFF")
+            productos_frame.grid(row=0, column=0, sticky="ew")
+            
+            for idx, (nombre, precio, img_bytes) in enumerate(productos):
+                col = idx % 4
+                row = idx // 4
+                
+                card = tk.Frame(
+                    productos_frame,
+                    bg="#F8F5EE",
+                    bd=2,
+                    relief="ridge",
+                    width=200,
+                    height=180
+                )
+                card.grid(row=row, column=col, padx=10, pady=10, sticky="nw")
+                card.grid_propagate(False)
+                
+                # Imagen
+                lbl_img = tk.Label(card, bg="#F8F5EE")
+                lbl_img.pack(pady=(15, 8))
+                
+                if img_bytes:
+                    try:
+                        from io import BytesIO
+                        from PIL import Image, ImageTk
+                        img = Image.open(BytesIO(img_bytes))
+                        img.thumbnail((90, 90))
+                        photo = ImageTk.PhotoImage(img)
+                        lbl_img.config(image=photo)
+                        lbl_img.image = photo
+                    except:
+                        lbl_img.config(text="🖼️", fg="#999", font=("Segoe UI", 24))
+                else:
+                    lbl_img.config(text="📷", fg="#999", font=("Segoe UI", 24))
+                
+                # Nombre
+                nombre_display = str(nombre)[:22] + ("..." if len(str(nombre)) > 22 else "")
+                tk.Label(
+                    card,
+                    text=nombre_display,
+                    bg="#F8F5EE",
+                    fg="#222222",
+                    font=("Segoe UI", 9, "bold"),
+                    wraplength=180,
+                    justify="center"
+                ).pack()
+                
+                # Precio
+                tk.Label(
+                    card,
+                    text=f"C$ {float(precio):.2f}",
+                    bg="#F8F5EE",
+                    fg="#157347",
+                    font=("Segoe UI", 10, "bold")
+                ).pack(pady=(8, 15))
+        
+        conexion.close()
+        
+        # Guardar referencia a la ventana actual
+        self.current_menu_window = inner    
 
     # ------------------------------------------------------------------
     # VENTANA DE GESTIÓN (CRUDs) + FLECHA PARA OCULTAR PANEL LATERAL
@@ -311,7 +888,6 @@ class RestauranteUI(tk.Tk):
             self.sidebar_visible = True
             if hasattr(self, "arrow_btn"):
                 self.arrow_btn.config(text="◀")   # flecha hacia la izquierda
-
 
     # ------------------------- UI --------------------------------
 
