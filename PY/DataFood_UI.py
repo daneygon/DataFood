@@ -1187,6 +1187,24 @@ class RestauranteUI(tk.Tk):
             ["IDProveedor", "Nombre Proveedor", "Teléfono"]
         )
 
+        # ==================== AÑADIR BÚSQUEDA ====================
+        # Crear un frame adicional para los controles de búsqueda
+        busqueda_frame = ttk.Frame(frame)
+        busqueda_frame.pack(fill="x", padx=10, pady=(5, 10))
+
+        # Etiqueta "Buscar nombre:"
+        ttk.Label(busqueda_frame, text="Buscar nombre:").pack(side="left", padx=(0, 5))
+
+        # Entry para búsqueda
+        buscar_entry = ttk.Entry(busqueda_frame, width=30)
+        buscar_entry.pack(side="left", padx=(0, 10))
+
+        # Botón de buscar
+        btn_buscar = ttk.Button(busqueda_frame, text="Buscar")
+        btn_buscar.pack(side="left")
+
+        # ==================== FIN DE AÑADIDOS ====================
+
         conexion = conectar()
         cursor = conexion.cursor()
 
@@ -1200,13 +1218,34 @@ class RestauranteUI(tk.Tk):
             return v.replace("(", "").replace(")", "").replace(",", "").replace("'", "").strip()
 
         # -------------------------------------------------
-        # CARGAR PROVEEDORES EN EL TREEVIEW
+        # VALIDAR TELÉFONO (8 dígitos, solo números)
         # -------------------------------------------------
-        def cargar_proveedores():
+        def validar_telefono(telefono):
+            telefono_str = str(telefono).strip()
+            
+            # Validar que solo contenga números
+            if not telefono_str.isdigit():
+                return False, "El teléfono solo puede contener números"
+            
+            # Validar que tenga exactamente 8 dígitos (formato Nicaragua)
+            if len(telefono_str) != 8:
+                return False, "El teléfono debe tener exactamente 8 dígitos"
+            
+            # Validar que no empiece con 0 (opcional, puedes quitar esto si quieres)
+            if telefono_str.startswith('0'):
+                return False, "El teléfono no puede empezar con 0"
+            
+            return True, ""
+
+        # -------------------------------------------------
+        # CARGAR PROVEEDORES EN EL TREEVIEW (MODIFICADA)
+        # -------------------------------------------------
+        def cargar_proveedores(texto_busqueda=""):
             for fila in tree.get_children():
                 tree.delete(fila)
 
-            cursor.execute("""
+            # Consulta base
+            sql = """
                 SELECT 
                     P.IDProveedor,
                     P.NombreProveedor,
@@ -1214,18 +1253,37 @@ class RestauranteUI(tk.Tk):
                 FROM Proveedores P
                 INNER JOIN TelefonoProveedores T
                     ON P.IDTelefonoProveedores = T.IDTelefonoProveedores
-                ORDER BY P.IDProveedor
-            """)
+            """
+            params = []
+            
+            # Aplicar búsqueda si hay texto
+            if texto_busqueda and texto_busqueda.strip():
+                sql += " WHERE P.NombreProveedor LIKE ?"
+                params.append(f"%{texto_busqueda.strip()}%")
+            
+            sql += " ORDER BY P.IDProveedor"
+
+            cursor.execute(sql, params)
 
             for row in cursor.fetchall():
                 limpio = [limpiar_valor(x) for x in row]
                 tree.insert("", "end", values=limpio)
 
-      
             self.cargar_proveedores_global()
 
         # -------------------------------------------------
-        # AGREGAR PROVEEDOR
+        # FUNCIÓN PARA BÚSQUEDA
+        # -------------------------------------------------
+        def aplicar_busqueda():
+            texto_busqueda = buscar_entry.get()
+            cargar_proveedores(texto_busqueda)
+
+        # Configurar eventos de búsqueda
+        buscar_entry.bind("<KeyRelease>", lambda e: aplicar_busqueda())
+        btn_buscar.config(command=aplicar_busqueda)
+
+        # -------------------------------------------------
+        # AGREGAR PROVEEDOR (CON VALIDACIÓN DE TELÉFONO)
         # -------------------------------------------------
         def agregar_proveedor():
             try:
@@ -1236,6 +1294,11 @@ class RestauranteUI(tk.Tk):
                     return msg.showwarning("Atención", "Debe ingresar el nombre del proveedor.")
                 if not telefono:
                     return msg.showwarning("Atención", "Debe ingresar un número de teléfono.")
+
+                # Validar teléfono
+                es_valido, mensaje_error = validar_telefono(telefono)
+                if not es_valido:
+                    return msg.showerror("Error de validación", mensaje_error)
 
                 # Insertar teléfono → obtener ID
                 cursor.execute("""
@@ -1261,7 +1324,7 @@ class RestauranteUI(tk.Tk):
                 msg.showerror("Error", f"No se pudo agregar:\n{e}")
 
         # -------------------------------------------------
-        # ELIMINAR PROVEEDOR
+        # ELIMINAR PROVEEDOR (CON CONFIRMACIÓN)
         # -------------------------------------------------
         def eliminar_proveedor():
             try:
@@ -1271,10 +1334,28 @@ class RestauranteUI(tk.Tk):
 
                 fila = tree.item(sel)["values"]
                 id_prov = int(limpiar_valor(fila[0]))
+                nombre_prov = limpiar_valor(fila[1])
+
+                # Mostrar diálogo de confirmación
+                confirmacion = msg.askyesno(
+                    "Confirmar eliminación",
+                    f"¿Está seguro de eliminar al proveedor:\n\n"
+                    f"Nombre: {nombre_prov}\n"
+                    f"ID: {id_prov}\n\n"
+                    f"Esta acción no se puede deshacer."
+                )
+                
+                if not confirmacion:
+                    return  # El usuario canceló
 
                 # Obtener IDTel antes de eliminar
                 cursor.execute("SELECT IDTelefonoProveedores FROM Proveedores WHERE IDProveedor=?", (id_prov,))
-                id_tel = cursor.fetchone()[0]
+                resultado = cursor.fetchone()
+                
+                if not resultado:
+                    return msg.showerror("Error", "No se encontró el proveedor en la base de datos.")
+                    
+                id_tel = resultado[0]
 
                 # Borrar proveedor
                 cursor.execute("DELETE FROM Proveedores WHERE IDProveedor=?", (id_prov,))
@@ -1289,7 +1370,7 @@ class RestauranteUI(tk.Tk):
                 msg.showerror("Error", f"No se pudo eliminar:\n{e}")
 
         # -------------------------------------------------
-        # EDITAR PROVEEDOR
+        # EDITAR PROVEEDOR (CON VALIDACIÓN DE TELÉFONO)
         # -------------------------------------------------
         def editar_proveedor():
             try:
@@ -1308,13 +1389,35 @@ class RestauranteUI(tk.Tk):
                 if not telefono:
                     return msg.showwarning("Atención", "Debe ingresar un teléfono.")
 
+                # Validar teléfono
+                es_valido, mensaje_error = validar_telefono(telefono)
+                if not es_valido:
+                    return msg.showerror("Error de validación", mensaje_error)
+
                 # Obtener ID teléfono
                 cursor.execute("""
                     SELECT IDTelefonoProveedores 
                     FROM Proveedores
                     WHERE IDProveedor=?
                 """, (id_prov,))
-                id_tel = cursor.fetchone()[0]
+                resultado = cursor.fetchone()
+                
+                if not resultado:
+                    return msg.showerror("Error", "No se encontró el proveedor.")
+                    
+                id_tel = resultado[0]
+
+                # Mostrar confirmación antes de editar
+                confirmacion = msg.askyesno(
+                    "Confirmar cambios",
+                    f"¿Está seguro de actualizar los datos del proveedor?\n\n"
+                    f"ID: {id_prov}\n"
+                    f"Nuevo nombre: {nombre}\n"
+                    f"Nuevo teléfono: {telefono}"
+                )
+                
+                if not confirmacion:
+                    return  # El usuario canceló
 
                 # Actualizar proveedor
                 cursor.execute("""
@@ -1345,10 +1448,8 @@ class RestauranteUI(tk.Tk):
             for e in entries.values():
                 e.delete(0, tk.END)
 
-
-
-                # -------------------------------------------------
-        # DETALLE AL HACER DOBLE CLIC (IGUAL QUE INSUMOS)
+        # -------------------------------------------------
+        # DETALLE AL HACER DOBLE CLIC
         # -------------------------------------------------
         def mostrar_detalle_proveedor(event=None):
             sel = tree.selection()
@@ -1487,22 +1588,16 @@ class RestauranteUI(tk.Tk):
         # doble clic → abrir detalle
         tree.bind("<Double-1>", mostrar_detalle_proveedor)
 
-     
-         # -------------------------------------------------
+        # -------------------------------------------------
         # ASIGNAR BOTONES
         # -------------------------------------------------
         btn_agregar.config(command=agregar_proveedor)
         btn_eliminar.config(command=eliminar_proveedor)
-
-        # Igual que en INSUMOS: este botón SOLO guarda cambios
         btn_editar.config(text="Guardar cambios", command=editar_proveedor)
-
         btn_limpiar.config(command=limpiar)
 
+        # Cargar proveedores inicialmente
         cargar_proveedores()
-
-
-
 
 
      # ---------------- ------------------------------------------------------------------TAB INSUMOS ----------------
@@ -4958,33 +5053,92 @@ class RestauranteUI(tk.Tk):
             )
         )
 
+        # ==================== AÑADIR BÚSQUEDA ====================
+        # Crear un frame adicional para los controles de búsqueda
+        busqueda_frame = ttk.Frame(frame)
+        busqueda_frame.pack(fill="x", padx=10, pady=(5, 10))
+
+        # Etiqueta "Buscar nombre:"
+        ttk.Label(busqueda_frame, text="Buscar nombre:").pack(side="left", padx=(0, 5))
+
+        # Entry para búsqueda
+        buscar_entry = ttk.Entry(busqueda_frame, width=30)
+        buscar_entry.pack(side="left", padx=(0, 10))
+
+        # Botón de buscar
+        btn_buscar = ttk.Button(busqueda_frame, text="Buscar")
+        btn_buscar.pack(side="left")
+
+        # ==================== FIN DE AÑADIDOS ====================
+
         # ---------- Conexión a la base de datos ----------
         conexion = conectar()
         cursor = conexion.cursor()
 
         # -------------------------------------------------
-        # CARGAR CLIENTES EN EL TREEVIEW
+        # VALIDAR TELÉFONO (8 dígitos, solo números)
         # -------------------------------------------------
-        def cargar_clientes():
+        def validar_telefono(telefono):
+            telefono_str = str(telefono).strip()
+            
+            # Validar que solo contenga números
+            if not telefono_str.isdigit():
+                return False, "El teléfono solo puede contener números"
+            
+            # Validar que tenga exactamente 8 dígitos (formato Nicaragua)
+            if len(telefono_str) != 8:
+                return False, "El teléfono debe tener exactamente 8 dígitos"
+            
+            # Validar que no empiece con 0
+            if telefono_str.startswith('0'):
+                return False, "El teléfono no puede empezar con 0"
+            
+            return True, ""
+
+        # -------------------------------------------------
+        # CARGAR CLIENTES EN EL TREEVIEW (MODIFICADA CON BÚSQUEDA)
+        # -------------------------------------------------
+        def cargar_clientes(texto_busqueda=""):
             """Carga los clientes desde SQL Server en la tabla."""
             for fila in tree.get_children():
                 tree.delete(fila)
 
-            cursor.execute(
-                """
+            sql = """
                 SELECT c.IDClientes, c.NumeroDeMesa, c.Nombre1, c.Nombre2, 
-                       c.Apellido1, c.Apellido2, t.Telefono
+                    c.Apellido1, c.Apellido2, t.Telefono
                 FROM Clientes c
                 INNER JOIN TelefonoCliente t ON c.IDTelefonoClientes = t.IDTelefonoClientes
-                ORDER BY c.IDClientes
             """
-            )
+            params = []
+            
+            # Aplicar búsqueda si hay texto
+            if texto_busqueda and texto_busqueda.strip():
+                sql += " WHERE (c.Nombre1 LIKE ? OR c.Nombre2 LIKE ? OR c.Apellido1 LIKE ? OR c.Apellido2 LIKE ?)"
+                params.append(f"%{texto_busqueda.strip()}%")
+                params.append(f"%{texto_busqueda.strip()}%")
+                params.append(f"%{texto_busqueda.strip()}%")
+                params.append(f"%{texto_busqueda.strip()}%")
+            
+            sql += " ORDER BY c.IDClientes"
+
+            cursor.execute(sql, params)
             for row in cursor.fetchall():
                 valores = [("—" if x is None else str(x).strip()) for x in row]
                 tree.insert("", "end", values=valores)
 
         # -------------------------------------------------
-        # AGREGAR CLIENTE
+        # FUNCIÓN PARA BÚSQUEDA
+        # -------------------------------------------------
+        def aplicar_busqueda():
+            texto_busqueda = buscar_entry.get()
+            cargar_clientes(texto_busqueda)
+
+        # Configurar eventos de búsqueda
+        buscar_entry.bind("<KeyRelease>", lambda e: aplicar_busqueda())
+        btn_buscar.config(command=aplicar_busqueda)
+
+        # -------------------------------------------------
+        # AGREGAR CLIENTE (CON VALIDACIÓN DE TELÉFONO)
         # -------------------------------------------------
         def agregar_cliente():
             """Agrega un nuevo cliente con su teléfono."""
@@ -5011,6 +5165,11 @@ class RestauranteUI(tk.Tk):
                 if not telefono:
                     msg.showwarning("Atención", "Debe ingresar un número de teléfono.")
                     return
+
+                # --- Validar teléfono ---
+                es_valido, mensaje_error = validar_telefono(telefono)
+                if not es_valido:
+                    return msg.showerror("Error de validación", mensaje_error)
 
                 # --- Insertar teléfono y obtener su ID ---
                 cursor.execute(
@@ -5050,7 +5209,7 @@ class RestauranteUI(tk.Tk):
                 msg.showerror("Error", f"No se pudo agregar el cliente:\n{e}")
 
         # -------------------------------------------------
-        # ELIMINAR CLIENTE
+        # ELIMINAR CLIENTE (CON CONFIRMACIÓN)
         # -------------------------------------------------
         def eliminar_cliente():
             """Elimina el cliente seleccionado en la tabla (y su teléfono asociado)."""
@@ -5065,6 +5224,22 @@ class RestauranteUI(tk.Tk):
                     return
 
                 id_cliente = int(vals[0])
+                nombre1 = vals[2] if len(vals) > 2 else ""
+                apellido1 = vals[4] if len(vals) > 4 else ""
+                mesa = vals[1] if len(vals) > 1 else ""
+
+                # Mostrar diálogo de confirmación
+                confirmacion = msg.askyesno(
+                    "Confirmar eliminación",
+                    f"¿Está seguro de eliminar al cliente:\n\n"
+                    f"ID: {id_cliente}\n"
+                    f"Nombre: {nombre1} {apellido1}\n"
+                    f"Mesa: {mesa}\n\n"
+                    f"Esta acción no se puede deshacer."
+                )
+                
+                if not confirmacion:
+                    return  # El usuario canceló
 
                 # Obtener IDTelefonoClientes para borrar también el teléfono
                 cursor.execute(
@@ -5089,7 +5264,7 @@ class RestauranteUI(tk.Tk):
                 msg.showerror("Error", f"No se pudo eliminar el cliente:\n{e}")
 
         # -------------------------------------------------
-        # EDITAR CLIENTE (GUARDAR CAMBIOS)
+        # EDITAR CLIENTE (CON VALIDACIÓN DE TELÉFONO Y CONFIRMACIÓN)
         # -------------------------------------------------
         def editar_cliente():
             """Guarda cambios del cliente seleccionado, usando el formulario."""
@@ -5104,6 +5279,8 @@ class RestauranteUI(tk.Tk):
                     return
 
                 id_cliente = int(vals[0])
+                nombre_actual = vals[2] if len(vals) > 2 else ""
+                apellido_actual = vals[4] if len(vals) > 4 else ""
 
                 mesa = entries["Número de Mesa"].get().strip()
                 nombre1 = entries["Nombre1"].get().strip()
@@ -5126,6 +5303,24 @@ class RestauranteUI(tk.Tk):
                 if not telefono:
                     msg.showwarning("Atención", "Debe ingresar un número de teléfono.")
                     return
+
+                # --- Validar teléfono ---
+                es_valido, mensaje_error = validar_telefono(telefono)
+                if not es_valido:
+                    return msg.showerror("Error de validación", mensaje_error)
+
+                # Mostrar confirmación antes de editar
+                confirmacion = msg.askyesno(
+                    "Confirmar cambios",
+                    f"¿Está seguro de actualizar los datos del cliente?\n\n"
+                    f"Cliente actual: {nombre_actual} {apellido_actual}\n"
+                    f"Nuevo nombre: {nombre1} {apellido1}\n"
+                    f"Nueva mesa: {mesa}\n"
+                    f"Nuevo teléfono: {telefono}"
+                )
+                
+                if not confirmacion:
+                    return  # El usuario canceló
 
                 # Actualizar teléfono vinculado
                 cursor.execute(
@@ -5324,7 +5519,6 @@ class RestauranteUI(tk.Tk):
 
         # ---------- Cargar datos al inicio ----------
         cargar_clientes()
-
 
     # ---------------- ---------------------------TAB VENTAS ----------------
         # ---------------- ---------------------------TAB VENTAS ----------------
