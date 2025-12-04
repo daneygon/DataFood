@@ -389,7 +389,6 @@ class RestauranteUI(tk.Tk):
         top_bar = tk.Frame(container, bg="#FFFFFF")
         top_bar.pack(fill="x", pady=(10, 5))
 
-        # Flecha retractil (misma del panel Gestion)
         self.arrow_btn = tk.Button(
             top_bar,
             text="◀",
@@ -408,45 +407,30 @@ class RestauranteUI(tk.Tk):
             font=("Segoe UI", 14, "bold")
         ).pack(side="left", padx=5)
 
-        # --------- PANEL PRINCIPAL DE REPORTES ----------
-        report_frame = tk.Frame(container, bg="#FFFFFF")
-        report_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-        # 🔥 Cargar reportes
+        # --------- PANEL PRINCIPAL — CON SCROLL ----------
+        report_canvas = tk.Canvas(container, bg="#FFFFFF", highlightthickness=0)
+        report_canvas.pack(side="left", fill="both", expand=True)
+
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=report_canvas.yview)
+        scrollbar.pack(side="right", fill="y")
+
+        report_canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Frame interior donde vive TODO
+        report_frame = tk.Frame(report_canvas, bg="#FFFFFF")
+        report_canvas.create_window((0, 0), window=report_frame, anchor="nw")
+
+        def _on_configure(event):
+            report_canvas.configure(scrollregion=report_canvas.bbox("all"))
+
+        report_frame.bind("<Configure>", _on_configure)
+
+        # Cargar contenido dentro del scroll
         self._cargar_reportes_panel(report_frame)
 
-        # =====================
-        # TEMAS DE COLOR
-        # =====================
-        tk.Label(
-            ajustes_frame,
-            text="Cambiar Tema",
-            bg="#FFFFFF",
-            fg="#333333",
-            font=("Segoe UI", 13, "bold")
-        ).pack(anchor="w", pady=(20,5))
 
-        btn_default = tk.Button(
-            ajustes_frame,
-            text="Modo Claro (Default)",
-            bg="#C8B88A",
-            fg="white",
-            relief="flat",
-            font=("Segoe UI", 11, "bold"),
-            command=lambda: self.aplicar_tema("default")
-        )
-        btn_default.pack(anchor="w", pady=5)
-
-        btn_dark = tk.Button(
-            ajustes_frame,
-            text="Modo Oscuro",
-            bg="#333333",
-            fg="white",
-            relief="flat",
-            font=("Segoe UI", 11, "bold"),
-            command=lambda: self.aplicar_tema("dark")
-        )
-        btn_dark.pack(anchor="w", pady=5)
+     
 
 
 #-------------------------REPORTES
@@ -536,29 +520,40 @@ class RestauranteUI(tk.Tk):
         crear_card("🟢 Ganancias Totales", ganancias, "#1E8449")
         crear_card("📘 Balance Final", balance, "#1F3A60")
 
-        # ------------------------------
-        # GRAFICO 1 — VENTAS POR MES
-        # ------------------------------
-        fig1 = plt.Figure(figsize=(5.5, 3), dpi=100)
+                # -------------------------------------
+        # GRAFICO 1 — VENTAS POR MES (ANCHO COMPLETO)
+        # -------------------------------------
+        graf1_frame = tk.Frame(parent, bg="#FFFFFF")
+        graf1_frame.pack(fill="x", pady=20)
+
+        fig1 = plt.Figure(figsize=(9, 4), dpi=100)
         ax1 = fig1.add_subplot(111)
         ax1.bar(meses, totales_mes, color="#2980B9")
-        ax1.set_title("Ventas por Mes")
+        ax1.set_title("Ventas por Mes", fontsize=12)
         ax1.set_xlabel("Mes")
         ax1.set_ylabel("C$")
 
-        canvas1 = FigureCanvasTkAgg(fig1, parent)
-        canvas1.get_tk_widget().pack(side="left", padx=20, pady=10)
+        canvas1 = FigureCanvasTkAgg(fig1, graf1_frame)
+        canvas1.get_tk_widget().pack(fill="x", expand=True)
 
-        # ------------------------------
-        # GRAFICO 2 — TOP 5 MÁS VENDIDOS
-        # ------------------------------
-        fig2 = plt.Figure(figsize=(5.5, 3), dpi=100)
+
+        # -------------------------------------
+        # GRAFICO 2 — TOP 5 MÁS VENDIDOS (ANCHO COMPLETO)
+        # -------------------------------------
+        graf2_frame = tk.Frame(parent, bg="#FFFFFF")
+        graf2_frame.pack(fill="x", pady=20)
+
+        fig2 = plt.Figure(figsize=(6, 3), dpi=100)
         ax2 = fig2.add_subplot(111)
         ax2.barh(productos, cantidades, color="#27AE60")
         ax2.set_title("Top 5 productos más vendidos")
 
+        # --- Usamos ticks enteros ---
+        ax2.set_xticks(range(0, max(cantidades) + 1))
+
         canvas2 = FigureCanvasTkAgg(fig2, parent)
         canvas2.get_tk_widget().pack(side="left", padx=20, pady=10)
+
 
     def _abrir_ventana_ajustes(self):
         """Carga la ventana de Ajustes dentro del center_frame igual que Gestión."""
@@ -6947,37 +6942,7 @@ class VentanaReportes(tk.Toplevel):
             font=("Segoe UI", 20, "bold")
         ).pack(pady=20)
 
-        # ====== CONTENEDOR CON SCROLL PARA REPORTES ======
-
-        canvas = tk.Canvas(
-            self.body,
-            bg=self.colors["panel"],
-            highlightthickness=0
-        )
-        canvas.pack(side="left", fill="both", expand=True)
-
-        scrollbar = ttk.Scrollbar(
-            self.body,
-            orient="vertical",
-            command=canvas.yview
-        )
-        scrollbar.pack(side="right", fill="y")
-
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        # Frame interior donde vivirán TODOS los gráficos
-        scroll_frame = tk.Frame(canvas, bg=self.colors["panel"])
-        canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
-
-        # Actualiza área del scroll
-        scroll_frame.bind(
-            "<Configure>",
-            lambda event: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        # IMPORTANTE: guardar referencia para usarlo después
-        self.scroll_frame = scroll_frame
-
+    
 
         # Cargar contenido
         self.cargar_reportes()
