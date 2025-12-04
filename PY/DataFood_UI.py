@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox as msg, filedialog
+import re
 from datetime import datetime
 from tkinter import messagebox as msg  
 import pyodbc                           
@@ -112,10 +113,10 @@ class RestauranteUI(tk.Tk):
         )
         gestion_btn.pack(fill="x", padx=15, pady=(10, 5))
 
-        ttk.Button(self.sidebar, text="Reportes (próximamente)").pack(
+        ttk.Button(self.sidebar, text="Reportes").pack(
             fill="x", padx=15, pady=5
         )
-        ttk.Button(self.sidebar, text="Ajustes (próximamente)").pack(
+        ttk.Button(self.sidebar, text="Ajustes").pack(
             fill="x", padx=15, pady=5
         )
 
@@ -641,7 +642,7 @@ class RestauranteUI(tk.Tk):
         # Flecha para volver al dashboard
         arrow_btn = tk.Button(
             top_bar,
-            text="← Volver al Inicio",
+            text="◀",
             bg="#FFFFFF",
             fg="#C8B88A",
             bd=0,
@@ -1131,6 +1132,7 @@ class RestauranteUI(tk.Tk):
 
         # devolvemos todo lo que necesita cada tab
         return entries, tree, btn_agregar, btn_editar, btn_eliminar, btn_limpiar
+        
 
 
 
@@ -4995,34 +4997,6 @@ class RestauranteUI(tk.Tk):
         cargar_produccion()
 
 
-    #----------------------------------------------------------------------------------TAB MENU DE PLATOS
-
-    def _create_tab_menu_platos(self, notebook):
-        frame = ttk.Frame(notebook)
-        notebook.add(frame, text="Menú de Platos")
-
-        # Sección vacía hasta proximamente salga inspo
-        tk.Label(
-            frame,
-            text="Sección Menú de Platos (vacía por ahora)",
-            font=("Segoe UI", 12, "bold"),
-            bg="#F5F1E8"
-        ).pack(pady=20)
-
-# ----------------------------------------------------------------------TAB MENU DE BEBIDAS
-    def _create_tab_menu_bebidas(self, notebook):
-        frame = ttk.Frame(notebook)
-        notebook.add(frame, text="Menú de Bebidas")
-
-        # Sección vacía hasta proximamente salga inspo
-        tk.Label(
-            frame,
-            text="Sección Menú de Bebidas (vacía por ahora)",
-            font=("Segoe UI", 12, "bold"),
-            bg="#F5F1E8"
-        ).pack(pady=20)
-
-
         # -------------------------------------  TAB CLIENTES ----------------
     def _create_tab_clientes(self, notebook):
         frame = ttk.Frame(notebook)
@@ -5521,2181 +5495,890 @@ class RestauranteUI(tk.Tk):
         cargar_clientes()
 
     # ---------------- ---------------------------TAB VENTAS ----------------
-        # ---------------- ---------------------------TAB VENTAS ----------------
+   # ---------------- ---------------------------TAB VENTAS ----------------
+# ---------------- ---------------------------TAB VENTAS ----------------
+# --------------------------- TAB VENTAS ---------------------------
     def _create_tab_ventas(self, notebook):
         frame = ttk.Frame(notebook)
         notebook.add(frame, text="Ventas")
 
-               # --- Crear contenido del tab ---
+        # --- Crear contenido general del tab ---
         entries, tree, btn_agregar, btn_editar, btn_eliminar, btn_limpiar = (
             self._create_tab_content(
                 frame,
                 "Gestión de Ventas",
-                [],  # <-- CAMBIA ESTO: lista vacía en lugar de los campos
+                [],
                 ["IDVenta", "Fecha", "Mesa", "Cliente", "Productos", "Cantidad Total", "Total Venta", "Estado"],
             )
         )
 
-                 # -------------------------------------------------
-        # FILTRO POR FECHA
-        # -------------------------------------------------
-        filtro_frame = tk.Frame(frame, bg="#F5F1E8")
-        filtro_frame.pack(fill="x", padx=10, pady=(5, 10))
-        
-        tk.Label(
-            filtro_frame,
-            text="Filtro:",
-            bg="#F5F1E8",
-            font=("Segoe UI", 10)
-        ).pack(side="left", padx=(0, 5))
-        
-        cmb_filtro_fecha = ttk.Combobox(
-            filtro_frame,
-            values=["Todos", "Hoy", "Ayer", "Últimos 7 días", "Este mes"],
-            state="readonly",
-            width=15,
-            font=("Segoe UI", 10)
-        )
-        cmb_filtro_fecha.pack(side="left", padx=(0, 10))
-        cmb_filtro_fecha.set("Todos")
 
-        # -------------------------------------------------
-        # CARGAR VENTAS CON FILTRO
-        # -------------------------------------------------
-                # -------------------------------------------------
-        # CARGAR VENTAS CON FILTRO
-        # -------------------------------------------------
-        def cargar_ventas(filtro="Todos"):
-            """Carga las ventas desde la base de datos con filtro por fecha."""
-            for fila in tree.get_children():
-                tree.delete(fila)
-
-            # Crear nueva conexión y cursor dentro de la función
-            conexion_local = conectar()
-            cursor_local = conexion_local.cursor()
-
-            # Construir consulta base
-            consulta = """
-                SELECT 
-                    V.IDVentas,
-                    CONCAT(RIGHT('0' + CAST(V.Dia AS VARCHAR(2)), 2), '/',
-                        RIGHT('0' + CAST(V.Mes AS VARCHAR(2)), 2), '/',
-                        CAST(V.Ano AS VARCHAR(4))) AS Fecha,
-                    CASE 
-                        WHEN VCM.IDClientes IS NOT NULL THEN 
-                            (SELECT TOP 1 NumeroDeMesa FROM Clientes WHERE IDClientes = VCM.IDClientes)
-                        ELSE 0
-                    END AS Mesa,
-                    CASE 
-                        WHEN VCM.IDClientes IS NOT NULL THEN 
-                            (SELECT TOP 1 CONCAT(Nombre1, ' ', Apellido1) 
-                            FROM Clientes WHERE IDClientes = VCM.IDClientes)
-                        ELSE 'Cliente ocasional'
-                    END AS Cliente,
-                    STUFF((
-                        SELECT ', ' + COALESCE(VCM2.NombrePlato, VCM2.NombreBebida, '')
-                        FROM VentasClientesMenuBebidasMenuPlatos VCM2
-                        WHERE VCM2.IDVentas = V.IDVentas
-                        FOR XML PATH('')
-                    ), 1, 2, '') AS Productos,
-                    (
-                        SELECT SUM(Cantidad)
-                        FROM VentasClientesMenuBebidasMenuPlatos VCM3
-                        WHERE VCM3.IDVentas = V.IDVentas
-                    ) AS CantidadTotal,
-                    V.MontoTotal,
-                    CASE 
-                        WHEN V.MontoTotal > 0 THEN 'Completada'
-                        ELSE 'Pendiente'
-                    END AS Estado
-                FROM Venta V
-                LEFT JOIN VentasClientesMenuBebidasMenuPlatos VCM ON V.IDVentas = VCM.IDVentas
-            """
-            
-            # Agregar condiciones según filtro
-            condiciones = []
-            fecha_actual = datetime.now()
-            
-            if filtro == "Hoy":
-                condiciones.append(f"V.Dia = {fecha_actual.day} AND V.Mes = {fecha_actual.month} AND V.Ano = {fecha_actual.year}")
-            elif filtro == "Ayer":
-                ayer = fecha_actual - timedelta(days=1)
-                condiciones.append(f"V.Dia = {ayer.day} AND V.Mes = {ayer.month} AND V.Ano = {ayer.year}")
-            elif filtro == "Últimos 7 días":
-                hace_7_dias = fecha_actual - timedelta(days=7)
-                condiciones.append(f"CONCAT(V.Ano, '-', RIGHT('0' + CAST(V.Mes AS VARCHAR(2)), 2), '-', RIGHT('0' + CAST(V.Dia AS VARCHAR(2)), 2)) >= '{hace_7_dias.strftime('%Y-%m-%d')}'")
-            elif filtro == "Este mes":
-                condiciones.append(f"V.Mes = {fecha_actual.month} AND V.Ano = {fecha_actual.year}")
-            
-            # Construir consulta final
-            if condiciones:
-                consulta += " WHERE " + " AND ".join(condiciones)
-            
-            consulta += """
-                GROUP BY V.IDVentas, V.Dia, V.Mes, V.Ano, V.MontoTotal, VCM.IDClientes
-                ORDER BY V.Ano DESC, V.Mes DESC, V.Dia DESC, V.IDVentas DESC
-            """
-            
-            try:
-                cursor_local.execute(consulta)
-                
-                for row in cursor_local.fetchall():
-                    # Formatear valores correctamente
-                    valores = []
-                    for i, x in enumerate(row):
-                        if x is None:
-                            valores.append("—")
-                        elif i == 5:  # CantidadTotal
-                            try:
-                                valores.append(str(int(x)))
-                            except:
-                                valores.append("0")
-                        elif i == 6:  # MontoTotal (Total Venta)
-                            try:
-                                valores.append(f"C$ {float(x):.2f}")
-                            except:
-                                valores.append("C$ 0.00")
-                        else:
-                            valores.append(str(x).strip())
-                    
-                    tree.insert("", "end", values=valores)
-                    
-            except Exception as e:
-                print(f"Error al cargar ventas: {e}")
-            finally:
-                cursor_local.close()
-                conexion_local.close()
-
-                # -------------------------------------------------
-        # CONFIGURAR FILTROS
-        # -------------------------------------------------
-                # Conectar filtro
-                # Conectar filtro
-        def aplicar_filtro():
-            filtro = cmb_filtro_fecha.get()
-            cargar_ventas(filtro)
-        
-        cmb_filtro_fecha.bind("<<ComboboxSelected>>", lambda e: aplicar_filtro())
-        
-        # ---------- Cargar datos al inicio ----------
-        cargar_ventas()
-
-        # -------------------------------------------------
-        # ELIMINAR VENTA
-        # -------------------------------------------------
-        def eliminar_venta():
-            """Elimina la venta seleccionada en la tabla."""
-            try:
-                seleccionado = tree.selection()
-                if not seleccionado:
-                    msg.showwarning("Atención", "Selecciona una venta para eliminar.")
-                    return
-
-                vals = tree.item(seleccionado)["values"]
-                if not vals:
-                    return
-
-                id_venta = int(vals[0])
-                
-                # Confirmar eliminación
-                confirmar = msg.askyesno(
-                    "Confirmar eliminación",
-                    f"¿Está seguro de eliminar la venta #{id_venta}?\n"
-                    "Esta acción eliminará todos los registros relacionados."
-                )
-                
-                if not confirmar:
-                    return
-
-                # Crear nueva conexión para eliminar
-                conexion_local = conectar()
-                cursor_local = conexion_local.cursor()
-                
-                # Eliminar en el orden correcto para evitar violaciones de FK
-                cursor_local.execute("DELETE FROM VentasClientesMenuBebidasMenuPlatos WHERE IDVentas = ?", (id_venta,))
-                cursor_local.execute("DELETE FROM Venta WHERE IDVentas = ?", (id_venta,))
-                conexion_local.commit()
-
-                msg.showinfo("Éxito", "Venta eliminada correctamente.")
-                cargar_ventas(cmb_filtro_fecha.get())  # Recargar con filtro actual
-
-            except Exception as e:
-                msg.showerror("Error", f"No se pudo eliminar la venta:\n{e}")
-            finally:
-                try:
-                    cursor_local.close()
-                    conexion_local.close()
-                except:
-                    pass
-
-        # -------------------------------------------------
-        # LIMPIAR CAMPOS
-        # -------------------------------------------------
-        def limpiar_campos():
-            """Limpia todos los campos de entrada."""
-            for e in entries.values():
-                e.delete(0, tk.END)
-
-                # Ocultar botón limpiar si no hay campos
         btn_limpiar.pack_forget()
-        # -------------------------------------------------
-        # DETALLE AL HACER DOBLE CLIC CON BOTÓN EDITAR
-        # -------------------------------------------------
-        def mostrar_detalle_venta(event=None):
-            sel = tree.selection()
-            if not sel:
-                return
 
-            vals = tree.item(sel)["values"]
-            if not vals:
-                return
+        # ---------- Filtro de búsqueda ----------
+        filtro_frame = tk.Frame(frame, bg="#F5F1E8")
+        filtro_frame.pack(fill="x", padx=10, pady=(10, 5))
 
-            id_venta, fecha, mesa, cliente, productos, cantidad_total, total_venta, estado = vals
+        tk.Label(filtro_frame, text="Filtrar por fecha:", bg="#F5F1E8",
+                font=("Segoe UI", 10)).pack(side="left", padx=(0, 10))
 
-            # Limpiar formato de moneda si existe
-            if "C$" in str(total_venta):
-                total_venta_limpio = str(total_venta).replace("C$", "").strip()
-            else:
-                total_venta_limpio = total_venta
+        tk.Label(filtro_frame, text="Desde:", bg="#F5F1E8").pack(side="left")
+        entry_fecha_desde = tk.Entry(filtro_frame, width=12)
+        entry_fecha_desde.pack(side="left", padx=5)
+        entry_fecha_desde.insert(0, "dd/mm/aaaa")
 
-            def safe(v):
-                return "—" if v in (None, "", "—") else v
+        tk.Label(filtro_frame, text="Hasta:", bg="#F5F1E8").pack(side="left")
+        entry_fecha_hasta = tk.Entry(filtro_frame, width=12)
+        entry_fecha_hasta.pack(side="left", padx=5)
+        entry_fecha_hasta.insert(0, "dd/mm/aaaa")
 
-            detalle = tk.Toplevel(self)
-            detalle.title(f"Detalle de la venta #{safe(id_venta)}")
-            detalle.configure(bg="#F5F1E8")
+        btn_filtrar = tk.Button(
+            filtro_frame, text="🔍 Filtrar", bg="#E5D8B4",
+            fg="#333", font=("Segoe UI", 9), relief="flat",
+            padx=10, pady=2
+        )
+        btn_filtrar.pack(side="left", padx=10)
 
-            ancho_ventana = 600
-            alto_ventana = 400
-            detalle.geometry(f"{ancho_ventana}x{alto_ventana}")
-            detalle.minsize(500, 350)
+        btn_limpiar_filtro = tk.Button(
+            filtro_frame, text="🗑️ Limpiar filtro", bg="#F2B6B6",
+            fg="#333", font=("Segoe UI", 9), relief="flat",
+            padx=10, pady=2
+        )
+        btn_limpiar_filtro.pack(side="left")
 
-            detalle.update_idletasks()
-            sw = detalle.winfo_screenwidth()
-            sh = detalle.winfo_screenheight()
-            ww = detalle.winfo_width()
-            wh = detalle.winfo_height()
-            x = (sw // 2) - (ww // 2)
-            y = (sh // 2) - (wh // 2)
-            detalle.geometry(f"{ww}x{wh}+{x}+{y}")
-
-            container = tk.Frame(detalle, bg="#F5F1E8")
-            container.pack(fill="both", expand=True, padx=10, pady=10)
-
-            card = tk.Frame(
-                container,
-                bg="#FDF7EA",
-                bd=1,
-                relief="solid",
-                padx=10,
-                pady=10,
-            )
-            card.pack(fill="both", expand=True)
-
-            canvas_d = tk.Canvas(card, bg="#FDF7EA", highlightthickness=0)
-            canvas_d.pack(side="left", fill="both", expand=True)
-
-            scrollbar_d = ttk.Scrollbar(card, orient="vertical", command=canvas_d.yview)
-            scrollbar_d.pack(side="right", fill="y")
-
-            canvas_d.configure(yscrollcommand=scrollbar_d.set)
-
-            content = tk.Frame(canvas_d, bg="#FDF7EA")
-            canvas_d.create_window((0, 0), window=content, anchor="nw")
-
-            def on_configure(event):
-                canvas_d.configure(scrollregion=canvas_d.bbox("all"))
-
-            content.bind("<Configure>", on_configure)
-
-            # Título
-            tk.Label(
-                content,
-                text=f"Venta #{safe(id_venta)}",
-                bg="#FDF7EA",
-                fg="#333333",
-                font=("Segoe UI", 14, "bold"),
-            ).grid(row=0, column=0, columnspan=2, pady=(5, 5), padx=5, sticky="w")
-
-            ttk.Separator(content, orient="horizontal").grid(
-                row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=(0, 8)
-            )
-
-            # Datos de la venta
-            datos = [
-                ("ID Venta", safe(id_venta)),
-                ("Fecha", safe(fecha)),
-                ("Mesa", safe(mesa)),
-                ("Cliente", safe(cliente)),
-                ("Estado", safe(estado)),
-                ("Productos", safe(productos)),
-                ("Cantidad Total", safe(cantidad_total)),
-                ("Total Venta", safe(total_venta)),
-            ]
-
-            for i, (label_txt, valor) in enumerate(datos, start=2):
-                tk.Label(
-                    content,
-                    text=label_txt + ":",
-                    bg="#FDF7EA",
-                    fg="#6A4E23",
-                    font=("Segoe UI", 10, "bold"),
-                ).grid(row=i, column=0, sticky="w", padx=10, pady=3)
-
-                tk.Label(
-                    content,
-                    text=str(valor),
-                    bg="#FDF7EA",
-                    fg="#222222",
-                    font=("Segoe UI", 10),
-                    wraplength=350 if label_txt == "Productos" else 250,
-                    justify="left",
-                ).grid(row=i, column=1, sticky="w", padx=5, pady=3)
-
-            last_row = len(datos) + 2
-
-            ttk.Separator(content, orient="horizontal").grid(
-                row=last_row, column=0, columnspan=2, sticky="ew", padx=5, pady=(8, 5)
-            )
-
-            # ----- BOTONES (Editar y Cerrar) -----
-            botones_frame = tk.Frame(content, bg="#FDF7EA")
-            botones_frame.grid(row=last_row + 1, column=0, columnspan=2, pady=(10, 5))
-
-            # Botón EDITAR
-            def editar_venta_detalle():
-                """Prepara la edición de la venta (rellena formulario principal)"""
-                # Extraer solo el número de mesa
-                mesa_num = ""
-                if safe(mesa) != "—":
-                    try:
-                        # Intentar extraer números de la cadena de mesa
-                        import re
-                        numeros = re.findall(r'\d+', str(mesa))
-                        if numeros:
-                            mesa_num = numeros[0]
-                    except:
-                        mesa_num = str(mesa)
-                
-                entries["Número de Mesa"].delete(0, tk.END)
-                entries["Número de Mesa"].insert(0, mesa_num)
-                
-                # Si el cliente no es ocasional, poner nombre
-                if safe(cliente) != "—" and "ocasional" not in str(cliente).lower():
-                    entries["Nombre Cliente (opcional)"].delete(0, tk.END)
-                    entries["Nombre Cliente (opcional)"].insert(0, safe(cliente))
-                
-                detalle.destroy()
-                # Aquí podrías abrir también la ventana de edición completa
-                msg.showinfo("Editar Venta", 
-                        "Los datos se han cargado en el formulario.\n"
-                        "Para una edición completa, use el botón 'Editar' principal.")
-
-            btn_editar_detalle = tk.Button(
-                botones_frame,
-                text="✏️ Editar esta venta",
-                bg="#E5D8B4",
-                fg="#333333",
-                font=("Segoe UI", 10, "bold"),
-                relief="flat",
-                padx=15,
-                pady=5,
-                command=editar_venta_detalle
-            )
-            btn_editar_detalle.pack(side="left", padx=5)
-
-            # Botón CERRAR
-            btn_cerrar = tk.Button(
-                botones_frame,
-                text="Cerrar",
-                bg="#F2B6B6",
-                fg="#333333",
-                font=("Segoe UI", 10, "bold"),
-                relief="flat",
-                padx=15,
-                pady=5,
-                command=detalle.destroy
-            )
-            btn_cerrar.pack(side="left", padx=5)
-
-            detalle.transient(self)
-            detalle.grab_set()
+        # ---------- Conexión a BD ----------
+        conexion = conectar()
+        cursor = conexion.cursor()
 
         # -------------------------------------------------
-        # EDITAR VENTA (GUARDAR CAMBIOS)
+        # FUNCIÓN: validar formato fecha
         # -------------------------------------------------
-                # -------------------------------------------------
-        # EDITAR VENTA (GUARDAR CAMBIOS)
-        # -------------------------------------------------
-        def editar_venta():
-            """Abre ventana para editar venta existente (similar a agregar pero con datos cargados)."""
-            seleccionado = tree.selection()
-            if not seleccionado:
-                msg.showwarning("Atención", "Seleccione una venta para editar.")
-                return
-            
-            vals = tree.item(seleccionado)["values"]
-            if not vals:
-                return
-            
-            id_venta = int(vals[0])
-            
-            # Obtener datos completos de la venta
+        def validar_formato_fecha(fecha_str):
             try:
-                cursor.execute("""
+                dia, mes, ano = map(int, fecha_str.split('/'))
+                return 1 <= mes <= 12 and 1 <= dia <= 31 and 1900 <= ano <= 2100
+            except:
+                return False
+
+        # -------------------------------------------------
+        # FUNCIÓN: cargar ventas al tree
+        # -------------------------------------------------
+        def cargar_ventas(fecha_desde=None, fecha_hasta=None):
+            for row in tree.get_children():
+                tree.delete(row)
+
+            try:
+                consulta = """
                     SELECT 
                         V.IDVentas,
-                        V.Dia,
-                        V.Mes,
-                        V.Ano,
+                        CONCAT(
+                            RIGHT('0' + CAST(V.Dia AS VARCHAR(2)),2), '/',
+                            RIGHT('0' + CAST(V.Mes AS VARCHAR(2)),2), '/',
+                            V.Ano
+                        ) AS Fecha,
+                        ISNULL(C.NumeroDeMesa, 0) AS Mesa,
+                        ISNULL(CONCAT(C.Nombre1, ' ', C.Apellido1), 'Cliente ocasional') AS Cliente,
+                        STUFF((
+                            SELECT ', ' + COALESCE(VC2.NombrePlato, VC2.NombreBebida, '')
+                            FROM VentasClientesMenuBebidasMenuPlatos VC2
+                            WHERE VC2.IDVentas = V.IDVentas
+                            FOR XML PATH('')
+                        ),1,2,'') AS Productos,
+                        (SELECT SUM(Cantidad)
+                        FROM VentasClientesMenuBebidasMenuPlatos VC3
+                        WHERE VC3.IDVentas = V.IDVentas) AS CantTotal,
                         V.MontoTotal,
-                        V.Hora,
-                        VCM.IDClientes,
-                        (SELECT TOP 1 NumeroDeMesa FROM Clientes WHERE IDClientes = VCM.IDClientes) as Mesa,
-                        (SELECT TOP 1 CONCAT(Nombre1, ' ', Apellido1) FROM Clientes WHERE IDClientes = VCM.IDClientes) as NombreCliente
+                        CASE WHEN V.MontoTotal > 0 THEN 'Completada'
+                            ELSE 'Pendiente' END AS Estado
                     FROM Venta V
-                    LEFT JOIN VentasClientesMenuBebidasMenuPlatos VCM ON V.IDVentas = VCM.IDVentas
-                    WHERE V.IDVentas = ?
-                    GROUP BY V.IDVentas, V.Dia, V.Mes, V.Ano, V.MontoTotal, V.Hora, VCM.IDClientes
-                """, (id_venta,))
-                
-                venta_data = cursor.fetchone()
-                
-                if not venta_data:
-                    msg.showerror("Error", "No se encontraron datos de la venta.")
-                    return
-                
-                # Obtener productos de esta venta
-                cursor.execute("""
-                    SELECT 
-                        NombrePlato,
-                        NombreBebida,
-                        Cantidad,
-                        Precio
-                    FROM VentasClientesMenuBebidasMenuPlatos
-                    WHERE IDVentas = ?
-                """, (id_venta,))
-                
-                productos_existentes = cursor.fetchall()
-                
-                # Abrir ventana de edición
-                abrir_ventana_edicion(id_venta, venta_data, productos_existentes)
-                
+                    LEFT JOIN VentasClientesMenuBebidasMenuPlatos VC ON VC.IDVentas = V.IDVentas
+                    LEFT JOIN Clientes C ON C.IDClientes = VC.IDClientes
+                    WHERE 1 = 1
+                """
+
+                params = []
+
+                if fecha_desde and fecha_desde != "dd/mm/aaaa":
+                    dia, mes, ano = map(int, fecha_desde.split('/'))
+                    consulta += " AND (V.Ano > ? OR (V.Ano=? AND V.Mes>? ) OR (V.Ano=? AND V.Mes=? AND V.Dia>=?))"
+                    params.extend([ano, ano, mes, ano, mes, dia])
+
+                if fecha_hasta and fecha_hasta != "dd/mm/aaaa":
+                    dia, mes, ano = map(int, fecha_hasta.split('/'))
+                    consulta += " AND (V.Ano < ? OR (V.Ano=? AND V.Mes<? ) OR (V.Ano=? AND V.Mes=? AND V.Dia<=?))"
+                    params.extend([ano, ano, mes, ano, mes, dia])
+
+                cursor.execute(consulta, params)
+                ventas = cursor.fetchall()
+
+                for row in ventas:
+                    valores = list(row)
+                    if valores[5] is None:
+                        valores[5] = "0"
+                    valores[6] = f"C$ {float(valores[6]):.2f}"
+                    tree.insert("", "end", values=valores)
+
             except Exception as e:
-                msg.showerror("Error", f"No se pudieron cargar los datos de la venta:\n{e}")
-        
-        def abrir_ventana_edicion(id_venta, venta_data, productos_existentes):
-            """Abre una ventana para editar una venta existente."""
-            ventana = tk.Toplevel(self)
-            ventana.title(f"Editar Venta #{id_venta}")
-            ventana.configure(bg="#F5F1E8")
-            ventana.geometry("1000x750")
-            
-            # Centrar ventana
-            ventana.update_idletasks()
-            sw = ventana.winfo_screenwidth()
-            sh = ventana.winfo_screenheight()
-            ww = ventana.winfo_width()
-            wh = ventana.winfo_height()
-            x = (sw // 2) - (ww // 2)
-            y = (sh // 2) - (wh // 2)
-            ventana.geometry(f"{ww}x{wh}+{x}+{y}")
-
-            # --- Variables de la ventana ---
-            productos_venta = []  # Lista de productos en esta venta
-            total_venta_var = tk.DoubleVar(value=0.0)
-            id_cliente_venta = venta_data[6] if venta_data[6] else None
-            
-            # --- Frame principal con scroll ---
-            main_container = tk.Frame(ventana, bg="#F5F1E8")
-            main_container.pack(fill="both", expand=True, padx=10, pady=10)
-            
-            # Canvas para scroll
-            canvas = tk.Canvas(main_container, bg="#F5F1E8", highlightthickness=0)
-            scrollbar = ttk.Scrollbar(main_container, orient="vertical", command=canvas.yview)
-            scrollable_frame = tk.Frame(canvas, bg="#F5F1E8")
-            
-            scrollable_frame.bind(
-                "<Configure>",
-                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-            )
-            
-            canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-            canvas.configure(yscrollcommand=scrollbar.set)
-            
-            canvas.pack(side="left", fill="both", expand=True)
-            scrollbar.pack(side="right", fill="y")
-
-            # Cargar información de productos desde la base de datos
-            productos_disponibles = {"Plato": {}, "Bebida": {}}
-            clientes_registrados = {}
-            
-            try:
-                # Cargar platos
-                cursor.execute("""
-                    SELECT 
-                        P.IDProduccion,
-                        P.NombrePlato,
-                        ISNULL(P.PrecioVenta, ISNULL(P.CostoPorPlato, 0)) as Precio,
-                        ISNULL(P.CantidadDePlatos, 0) as Stock
-                    FROM Produccion P
-                    WHERE P.NombrePlato IS NOT NULL 
-                    AND P.NombrePlato != ''
-                    ORDER BY P.NombrePlato
-                """)
-                
-                for row in cursor.fetchall():
-                    id_prod, nombre, precio, stock = row
-                    productos_disponibles["Plato"][nombre] = {
-                        "id": id_prod,
-                        "precio": float(precio),
-                        "stock": int(stock)
-                    }
-                
-                # Cargar bebidas
-                cursor.execute("""
-                    SELECT 
-                        P.IDProduccion,
-                        P.NombreBebida,
-                        ISNULL(P.PrecioVenta, ISNULL(P.CostoPorBebida, 0)) as Precio,
-                        ISNULL(P.CantidadDeBebidas, 0) as Stock
-                    FROM Produccion P
-                    WHERE P.NombreBebida IS NOT NULL 
-                    AND P.NombreBebida != ''
-                    ORDER BY P.NombreBebida
-                """)
-                
-                for row in cursor.fetchall():
-                    id_prod, nombre, precio, stock = row
-                    productos_disponibles["Bebida"][nombre] = {
-                        "id": id_prod,
-                        "precio": float(precio),
-                        "stock": int(stock)
-                    }
-                    
-                # Cargar clientes registrados
-                cursor.execute("""
-                    SELECT 
-                        C.IDClientes,
-                        C.Nombre1,
-                        C.Apellido1,
-                        C.NumeroDeMesa,
-                        T.Telefono
-                    FROM Clientes C
-                    LEFT JOIN TelefonoCliente T ON C.IDTelefonoClientes = T.IDTelefonoClientes
-                    ORDER BY C.Nombre1, C.Apellido1
-                """)
-                
-                for row in cursor.fetchall():
-                    id_cliente, nombre, apellido, mesa, telefono = row
-                    nombre_completo = f"{nombre} {apellido}"
-                    clientes_registrados[id_cliente] = {
-                        "nombre": nombre_completo,
-                        "mesa": mesa,
-                        "telefono": telefono if telefono else "Sin teléfono"
-                    }
-                    
-            except Exception as e:
-                msg.showerror("Error", f"No se pudieron cargar los datos:\n{e}")
-                ventana.destroy()
-                return
-
-            # --- Sección 1: Información de la mesa y cliente ---
-            info_frame = tk.Frame(scrollable_frame, bg="#FDF7EA", bd=2, relief="solid")
-            info_frame.pack(fill="x", padx=5, pady=(0, 15))
-            
-            tk.Label(
-                info_frame,
-                text="📋 Editar Información de la Venta",
-                bg="#FDF7EA",
-                fg="#333333",
-                font=("Segoe UI", 12, "bold")
-            ).pack(anchor="w", padx=15, pady=(10, 5))
-            
-            # Número de mesa
-            mesa_frame = tk.Frame(info_frame, bg="#FDF7EA")
-            mesa_frame.pack(fill="x", padx=15, pady=(0, 10))
-            
-            tk.Label(mesa_frame, text="Número de Mesa*:", bg="#FDF7EA", 
-                    font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="e", padx=5)
-            
-            entry_mesa = tk.Entry(mesa_frame, font=("Segoe UI", 10), width=15)
-            entry_mesa.grid(row=0, column=1, sticky="w", padx=5)
-            
-            # Cargar datos existentes
-            mesa_existente = venta_data[7] if venta_data[7] else "1"
-            entry_mesa.insert(0, str(mesa_existente))
-            
-            # Opción de cliente
-            cliente_frame = tk.Frame(info_frame, bg="#FDF7EA")
-            cliente_frame.pack(fill="x", padx=15, pady=(0, 10))
-            
-            tk.Label(cliente_frame, text="Cliente:", bg="#FDF7EA",
-                    font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="e", padx=5)
-            
-            # Frame para opciones de cliente
-            cliente_opciones_frame = tk.Frame(cliente_frame, bg="#FDF7EA")
-            cliente_opciones_frame.grid(row=0, column=1, sticky="w", padx=5)
-            
-            # Variable para opción de cliente
-            opcion_cliente = tk.StringVar(value="seleccionar" if id_cliente_venta else "ocasional")
-            
-            # Radio buttons para tipo de cliente
-            rb_ocasional = tk.Radiobutton(
-                cliente_opciones_frame,
-                text="Cliente ocasional",
-                variable=opcion_cliente,
-                value="ocasional",
-                bg="#FDF7EA",
-                font=("Segoe UI", 9),
-                command=lambda: toggle_cliente_fields("ocasional")
-            )
-            rb_ocasional.pack(side="left", padx=(0, 15))
-            
-            rb_registrar = tk.Radiobutton(
-                cliente_opciones_frame,
-                text="Registrar nuevo cliente",
-                variable=opcion_cliente,
-                value="registrar",
-                bg="#FDF7EA",
-                font=("Segoe UI", 9),
-                command=lambda: toggle_cliente_fields("registrar")
-            )
-            rb_registrar.pack(side="left", padx=(0, 15))
-            
-            rb_seleccionar = tk.Radiobutton(
-                cliente_opciones_frame,
-                text="Seleccionar cliente existente",
-                variable=opcion_cliente,
-                value="seleccionar",
-                bg="#FDF7EA",
-                font=("Segoe UI", 9),
-                command=lambda: toggle_cliente_fields("seleccionar")
-            )
-            rb_seleccionar.pack(side="left")
-            
-            # Frame para campos de cliente (inicialmente oculto)
-            campos_cliente_frame = tk.Frame(info_frame, bg="#FDF7EA")
-            
-            # Frame para seleccionar cliente existente (inicialmente oculto)
-            seleccionar_cliente_frame = tk.Frame(info_frame, bg="#FDF7EA")
-            
-            def toggle_cliente_fields(opcion):
-                if opcion == "registrar":
-                    campos_cliente_frame.pack(fill="x", padx=15, pady=(5, 10))
-                    seleccionar_cliente_frame.pack_forget()
-                    # Actualizar mesa automáticamente
-                    mesa = entry_mesa.get().strip()
-                    if mesa.isdigit():
-                        entry_mesa_cliente.delete(0, tk.END)
-                        entry_mesa_cliente.insert(0, mesa)
-                elif opcion == "seleccionar":
-                    seleccionar_cliente_frame.pack(fill="x", padx=15, pady=(5, 10))
-                    campos_cliente_frame.pack_forget()
-                    cargar_lista_clientes()
-                    
-                    # Seleccionar el cliente actual si existe
-                    if id_cliente_venta and id_cliente_venta in clientes_registrados:
-                        cmb_cliente_existente.set(clientes_registrados[id_cliente_venta]["nombre"])
-                else:  # ocasional
-                    campos_cliente_frame.pack_forget()
-                    seleccionar_cliente_frame.pack_forget()
-            
-            # Campos para nuevo cliente
-            tk.Label(campos_cliente_frame, text="Nombre*:", bg="#FDF7EA").grid(row=0, column=0, sticky="e", padx=5, pady=2)
-            entry_nombre_cliente = tk.Entry(campos_cliente_frame, width=25)
-            entry_nombre_cliente.grid(row=0, column=1, sticky="w", padx=5, pady=2)
-            
-            tk.Label(campos_cliente_frame, text="Apellido*:", bg="#FDF7EA").grid(row=0, column=2, sticky="e", padx=5, pady=2)
-            entry_apellido_cliente = tk.Entry(campos_cliente_frame, width=25)
-            entry_apellido_cliente.grid(row=0, column=3, sticky="w", padx=5, pady=2)
-            
-            tk.Label(campos_cliente_frame, text="Teléfono:", bg="#FDF7EA").grid(row=1, column=0, sticky="e", padx=5, pady=2)
-            entry_telefono_cliente = tk.Entry(campos_cliente_frame, width=25)
-            entry_telefono_cliente.grid(row=1, column=1, sticky="w", padx=5, pady=2)
-            
-            tk.Label(campos_cliente_frame, text="Mesa:", bg="#FDF7EA").grid(row=1, column=2, sticky="e", padx=5, pady=2)
-            entry_mesa_cliente = tk.Entry(campos_cliente_frame, width=10)
-            entry_mesa_cliente.grid(row=1, column=3, sticky="w", padx=5, pady=2)
-            
-            # Sincronizar mesa principal con mesa del cliente
-            
-            
-            campos_cliente_frame.columnconfigure(1, weight=1)
-            campos_cliente_frame.columnconfigure(3, weight=1)
-            
-            # Frame para seleccionar cliente existente
-            tk.Label(seleccionar_cliente_frame, text="Cliente existente:", bg="#FDF7EA",
-                    font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="e", padx=5, pady=2)
-            
-            # Combobox para seleccionar cliente
-            cmb_cliente_existente = ttk.Combobox(seleccionar_cliente_frame, 
-                                                state="readonly", 
-                                                width=40,
-                                                font=("Segoe UI", 9))
-            cmb_cliente_existente.grid(row=0, column=1, sticky="w", padx=5, pady=2)
-            
-            # Botón para refrescar lista de clientes
-            btn_refrescar_clientes = tk.Button(
-                seleccionar_cliente_frame,
-                text="🔄",
-                bg="#E5D8B4",
-                fg="#333333",
-                font=("Segoe UI", 9),
-                relief="flat",
-                width=3,
-                command=lambda: cargar_lista_clientes()
-            )
-            btn_refrescar_clientes.grid(row=0, column=2, sticky="w", padx=(5, 0))
-            
-            # Información del cliente seleccionado
-            lbl_info_cliente = tk.Label(seleccionar_cliente_frame, 
-                                    text="",
-                                    bg="#FDF7EA",
-                                    fg="#555555",
-                                    font=("Segoe UI", 9),
-                                    justify="left")
-            lbl_info_cliente.grid(row=1, column=0, columnspan=3, sticky="w", padx=5, pady=(5, 0))
-            
-            def cargar_lista_clientes():
-                """Carga la lista de clientes en el combobox."""
-                if clientes_registrados:
-                    # Crear lista de nombres de clientes
-                    lista_clientes = []
-                    for id_cliente, info in clientes_registrados.items():
-                        lista_clientes.append(info['nombre'])
-                    
-                    cmb_cliente_existente["values"] = lista_clientes
-                    
-                    # Seleccionar cliente actual si existe
-                    if id_cliente_venta and id_cliente_venta in clientes_registrados:
-                        cmb_cliente_existente.set(clientes_registrados[id_cliente_venta]["nombre"])
-                        mostrar_info_cliente(clientes_registrados[id_cliente_venta]["nombre"])
-                    elif lista_clientes:
-                        cmb_cliente_existente.set(lista_clientes[0])
-                        mostrar_info_cliente(lista_clientes[0])
-                else:
-                    cmb_cliente_existente["values"] = ["No hay clientes registrados"]
-                    cmb_cliente_existente.set("No hay clientes registrados")
-                    lbl_info_cliente.config(text="")
-            
-            def mostrar_info_cliente(cliente_seleccionado):
-                """Muestra la información del cliente seleccionado."""
-                # Buscar el cliente en el diccionario por nombre completo
-                for id_cliente, info in clientes_registrados.items():
-                    if info["nombre"] == cliente_seleccionado:
-                        info_text = f"Mesa: {info['mesa']} | Teléfono: {info['telefono']}"
-                        lbl_info_cliente.config(text=info_text)
-                        
-                        # Actualizar número de mesa principal
-                        entry_mesa.delete(0, tk.END)
-                        entry_mesa.insert(0, str(info["mesa"]))
-                        break
-            
-            cmb_cliente_existente.bind("<<ComboboxSelected>>", 
-                                    lambda e: mostrar_info_cliente(cmb_cliente_existente.get()))
-            
-            # Inicializar campos de cliente según datos existentes
-            if id_cliente_venta:
-                toggle_cliente_fields("seleccionar")
-            else:
-                toggle_cliente_fields("ocasional")
-            
-            # --- Sección 2: Agregar productos ---
-            productos_frame = tk.Frame(scrollable_frame, bg="#FDF7EA", bd=2, relief="solid")
-            productos_frame.pack(fill="x", padx=5, pady=(0, 15))
-            
-            tk.Label(
-                productos_frame,
-                text="🛒 Productos de la Venta",
-                bg="#FDF7EA",
-                fg="#333333",
-                font=("Segoe UI", 12, "bold")
-            ).pack(anchor="w", padx=15, pady=(10, 5))
-            
-            # Controles para agregar producto
-            control_frame = tk.Frame(productos_frame, bg="#FDF7EA")
-            control_frame.pack(fill="x", padx=15, pady=(0, 10))
-            
-            # Tipo de producto
-            tk.Label(control_frame, text="Tipo:", bg="#FDF7EA", 
-                    font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="e", padx=5)
-            
-            cmb_tipo = ttk.Combobox(control_frame, values=["Plato", "Bebida"], 
-                                    state="readonly", width=12, font=("Segoe UI", 9))
-            cmb_tipo.grid(row=0, column=1, sticky="w", padx=5)
-            cmb_tipo.set("Plato")
-            
-            # Producto
-            tk.Label(control_frame, text="Producto:", bg="#FDF7EA",
-                    font=("Segoe UI", 9, "bold")).grid(row=0, column=2, sticky="e", padx=5)
-            
-            cmb_producto = ttk.Combobox(control_frame, state="readonly", 
-                                        width=35, font=("Segoe UI", 9))
-            cmb_producto.grid(row=0, column=3, sticky="ew", padx=5)
-            
-            # Cantidad
-            tk.Label(control_frame, text="Cantidad:", bg="#FDF7EA",
-                    font=("Segoe UI", 9, "bold")).grid(row=0, column=4, sticky="e", padx=5)
-            
-            spin_cantidad = tk.Spinbox(control_frame, from_=1, to=100, width=8, 
-                                    font=("Segoe UI", 9))
-            spin_cantidad.grid(row=0, column=5, sticky="w", padx=5)
-            
-            # Etiqueta para mostrar stock
-            lbl_stock = tk.Label(control_frame, 
-                                text="Stock: 0",
-                                bg="#FDF7EA",
-                                fg="#666666",
-                                font=("Segoe UI", 9))
-            lbl_stock.grid(row=0, column=6, sticky="w", padx=10)
-            
-            control_frame.columnconfigure(3, weight=1)
-            
-            # Función para actualizar productos según tipo
-            def actualizar_productos(*args):
-                tipo = cmb_tipo.get()
-                if tipo in productos_disponibles:
-                    productos = list(productos_disponibles[tipo].keys())
-                    cmb_producto["values"] = productos
-                    if productos:
-                        cmb_producto.set(productos[0])
-                        actualizar_info_stock(productos[0])
-                else:
-                    cmb_producto["values"] = []
-                    cmb_producto.set("")
-                    lbl_stock.config(text="Stock: 0")
-            
-            # Función para actualizar información de stock
-            def actualizar_info_stock(producto_seleccionado):
-                tipo = cmb_tipo.get()
-                if tipo in productos_disponibles and producto_seleccionado in productos_disponibles[tipo]:
-                    stock = productos_disponibles[tipo][producto_seleccionado]["stock"]
-                    
-                    # Cambiar color según stock disponible
-                    if stock <= 0:
-                        lbl_stock.config(text=f"Stock: {stock} (AGOTADO)", fg="#FF0000")
-                    elif stock <= 5:
-                        lbl_stock.config(text=f"Stock: {stock} (BAJO)", fg="#FFA500")
-                    else:
-                        lbl_stock.config(text=f"Stock: {stock}", fg="#008000")
-                else:
-                    lbl_stock.config(text="Stock: 0", fg="#666666")
-            
-            # Función para verificar stock antes de agregar
-            def verificar_stock_antes_agregar():
-                tipo = cmb_tipo.get()
-                producto = cmb_producto.get()
-                cantidad_str = spin_cantidad.get()
-                
-                if not tipo or not producto:
-                    msg.showwarning("Atención", "Seleccione tipo y producto.")
-                    return False
-                
-                if not cantidad_str.isdigit():
-                    msg.showwarning("Atención", "Ingrese una cantidad válida.")
-                    return False
-                
-                cantidad = int(cantidad_str)
-                
-                if cantidad <= 0:
-                    msg.showwarning("Atención", "La cantidad debe ser mayor a 0.")
-                    return False
-                
-                # Verificar stock
-                if producto in productos_disponibles[tipo]:
-                    info = productos_disponibles[tipo][producto]
-                    
-                    # Verificar si ya está en la lista de productos
-                    for prod in productos_venta:
-                        if prod["nombre"] == producto and prod["tipo"] == tipo:
-                            total_cantidad = prod["cantidad"] + cantidad
-                            if total_cantidad > info["stock"]:
-                                msg.showwarning("Stock insuficiente", 
-                                            f"Ya tiene {prod['cantidad']} unidades en la venta.\n"
-                                            f"Stock total disponible: {info['stock']}\n"
-                                            f"Total solicitado: {total_cantidad}\n"
-                                            f"Faltan: {total_cantidad - info['stock']} unidades")
-                                return False
-                            break
-                    
-                    return True
-                else:
-                    msg.showerror("Error", "Producto no encontrado.")
-                    return False
-            
-            cmb_tipo.bind("<<ComboboxSelected>>", actualizar_productos)
-            cmb_producto.bind("<<ComboboxSelected>>", 
-                            lambda e: actualizar_info_stock(cmb_producto.get()))
-            
-            actualizar_productos()  # Inicializar
-            
-            # Treeview para productos de la venta
-            tree_productos_frame = tk.Frame(productos_frame, bg="#FDF7EA")
-            tree_productos_frame.pack(fill="both", expand=True, padx=15, pady=(0, 10))
-            
-            # Crear treeview para productos
-            tree_productos = ttk.Treeview(
-                tree_productos_frame,
-                columns=("Producto", "Cantidad", "Precio Unitario", "Subtotal"),
-                show="headings",
-                height=6
-            )
-            
-            # Configurar columnas
-            tree_productos.heading("Producto", text="Producto")
-            tree_productos.heading("Cantidad", text="Cantidad")
-            tree_productos.heading("Precio Unitario", text="Precio Unitario")
-            tree_productos.heading("Subtotal", text="Subtotal")
-            
-            tree_productos.column("Producto", width=250, anchor="w")
-            tree_productos.column("Cantidad", width=80, anchor="center")
-            tree_productos.column("Precio Unitario", width=120, anchor="e")
-            tree_productos.column("Subtotal", width=120, anchor="e")
-            
-            # Scrollbar
-            scroll_productos = ttk.Scrollbar(tree_productos_frame, orient="vertical", command=tree_productos.yview)
-            tree_productos.configure(yscrollcommand=scroll_productos.set)
-            
-            tree_productos.pack(side="left", fill="both", expand=True)
-            scroll_productos.pack(side="right", fill="y")
-            
-            # Cargar productos existentes
-            total_inicial = 0.0
-            for prod in productos_existentes:
-                nombre_plato, nombre_bebida, cantidad, precio = prod
-                nombre = nombre_plato if nombre_plato else nombre_bebida
-                tipo = "Plato" if nombre_plato else "Bebida"
-                subtotal = float(precio) * int(cantidad)
-                total_inicial += subtotal
-                
-                # Agregar a lista de productos
-                productos_venta.append({
-                    "tipo": tipo,
-                    "nombre": nombre,
-                    "cantidad": int(cantidad),
-                    "precio_unitario": float(precio),
-                    "subtotal": subtotal
-                })
-                
-                # Agregar al treeview
-                tree_productos.insert("", "end", values=(
-                    nombre,
-                    cantidad,
-                    f"C$ {float(precio):.2f}",
-                    f"C$ {subtotal:.2f}"
-                ))
-            
-            # --- Sección 3: Resumen y total ---
-            resumen_frame = tk.Frame(scrollable_frame, bg="#FDF7EA", bd=2, relief="solid")
-            resumen_frame.pack(fill="x", padx=5, pady=(0, 15))
-            
-            tk.Label(
-                resumen_frame,
-                text="💰 Resumen de la Venta",
-                bg="#FDF7EA",
-                fg="#333333",
-                font=("Segoe UI", 12, "bold")
-            ).pack(anchor="w", padx=15, pady=(10, 5))
-            
-            # Frame para total
-            total_frame = tk.Frame(resumen_frame, bg="#FDF7EA")
-            total_frame.pack(fill="x", padx=15, pady=(0, 10))
-            
-            tk.Label(
-                total_frame,
-                text="TOTAL:",
-                bg="#FDF7EA",
-                fg="#333333",
-                font=("Segoe UI", 14, "bold")
-            ).pack(side="left", padx=(0, 10))
-            
-            lbl_total = tk.Label(
-                total_frame,
-                text=f"C$ {total_inicial:.2f}",
-                bg="#FDF7EA",
-                fg="#157347",
-                font=("Segoe UI", 16, "bold")
-            )
-            lbl_total.pack(side="left")
-            
-            total_venta_var.set(total_inicial)
-            
-            # --- Sección 4: Botones finales ---
-            botones_frame = tk.Frame(scrollable_frame, bg="#F5F1E8")
-            botones_frame.pack(fill="x", padx=5, pady=(0, 10))
-            
-            # -------------------------------------------------
-            # FUNCIONES PARA MANEJAR PRODUCTOS
-            # -------------------------------------------------
-            
-            # Función para agregar producto a la venta
-            def agregar_producto_venta():
-                if not verificar_stock_antes_agregar():
-                    return
-                
-                tipo = cmb_tipo.get()
-                producto = cmb_producto.get()
-                cantidad_str = spin_cantidad.get()
-                cantidad = int(cantidad_str)
-                
-                # Obtener el total actual
-                current_total = total_venta_var.get()
-                
-                # Buscar producto en disponibilidad para obtener precio
-                precio = productos_disponibles[tipo][producto]["precio"]
-                subtotal = precio * cantidad
-                
-                # Verificar si ya está en la lista
-                producto_existente = False
-                for i, prod in enumerate(productos_venta):
-                    if prod["nombre"] == producto and prod["tipo"] == tipo:
-                        # Actualizar cantidad existente
-                        productos_venta[i]["cantidad"] += cantidad
-                        productos_venta[i]["subtotal"] = productos_venta[i]["precio_unitario"] * productos_venta[i]["cantidad"]
-                        
-                        # Actualizar treeview
-                        for item in tree_productos.get_children():
-                            if tree_productos.item(item)["values"][0] == producto:
-                                tree_productos.item(item, values=(
-                                    producto,
-                                    productos_venta[i]["cantidad"],
-                                    f"C$ {productos_venta[i]['precio_unitario']:.2f}",
-                                    f"C$ {productos_venta[i]['subtotal']:.2f}"
-                                ))
-                                break
-                        
-                        # Actualizar total
-                        nuevo_total = current_total + (precio * cantidad)
-                        total_venta_var.set(nuevo_total)
-                        lbl_total.config(text=f"C$ {nuevo_total:.2f}")
-                        
-                        producto_existente = True
-                        break
-                
-                # Si no está en la lista, agregar nuevo
-                if not producto_existente:
-                    # Agregar a la lista de productos
-                    productos_venta.append({
-                        "tipo": tipo,
-                        "nombre": producto,
-                        "cantidad": cantidad,
-                        "precio_unitario": precio,
-                        "subtotal": subtotal
-                    })
-                    
-                    # Actualizar treeview
-                    tree_productos.insert("", "end", values=(
-                        producto,
-                        cantidad,
-                        f"C$ {precio:.2f}",
-                        f"C$ {subtotal:.2f}"
-                    ))
-                    
-                    # Actualizar total
-                    nuevo_total = current_total + subtotal
-                    total_venta_var.set(nuevo_total)
-                    lbl_total.config(text=f"C$ {nuevo_total:.2f}")
-                
-                # Limpiar cantidad y actualizar stock display
-                spin_cantidad.delete(0, tk.END)
-                spin_cantidad.insert(0, "1")
-                actualizar_info_stock(producto)
-            
-            # Función para eliminar producto seleccionado
-            def eliminar_producto_seleccionado():
-                seleccionado = tree_productos.selection()
-                if not seleccionado:
-                    msg.showwarning("Atención", "Seleccione un producto para eliminar.")
-                    return
-                
-                # Obtener información del producto
-                item = tree_productos.item(seleccionado[0])
-                valores = item["values"]
-                nombre_producto = valores[0]
-                cantidad = int(valores[1])
-                
-                # Obtener el total actual
-                current_total = total_venta_var.get()
-                
-                # Restar del total
-                subtotal = float(valores[3].replace("C$", "").strip())
-                nuevo_total = current_total - subtotal
-                total_venta_var.set(nuevo_total)
-                lbl_total.config(text=f"C$ {nuevo_total:.2f}")
-                
-                # Eliminar de la lista de productos
-                for i, prod in enumerate(productos_venta):
-                    if prod["nombre"] == nombre_producto:
-                        productos_venta.pop(i)
-                        break
-                
-                # Eliminar del treeview
-                tree_productos.delete(seleccionado[0])
-            
-            # Función para guardar cambios
-            def guardar_cambios():
-                # Obtener el total de la variable
-                total_venta = total_venta_var.get()
-                
-                # Validaciones
-                mesa = entry_mesa.get().strip()
-                if not mesa or not mesa.isdigit():
-                    msg.showwarning("Atención", "Ingrese un número de mesa válido.")
-                    return
-                
-                if not productos_venta:
-                    msg.showwarning("Atención", "La venta debe tener al menos un producto.")
-                    return
-                
-                try:
-                    # Procesar cliente según opción seleccionada
-                    nuevo_id_cliente = None
-                    
-                    if opcion_cliente.get() == "registrar":
-                        nombre = entry_nombre_cliente.get().strip()
-                        apellido = entry_apellido_cliente.get().strip()
-                        telefono = entry_telefono_cliente.get().strip()
-                        mesa_cliente = entry_mesa_cliente.get().strip()
-                        
-                        if not nombre or not apellido:
-                            msg.showwarning("Atención", "Ingrese nombre y apellido del cliente.")
-                            return
-                        
-                        # Insertar teléfono si se proporcionó
-                        if telefono:
-                            cursor.execute(
-                                "INSERT INTO TelefonoCliente (Telefono) VALUES (?)",
-                                (telefono,)
-                            )
-                            cursor.execute("SELECT MAX(IDTelefonoClientes) FROM TelefonoCliente")
-                            id_telefono = cursor.fetchone()[0]
-                        else:
-                            cursor.execute("INSERT INTO TelefonoCliente (Telefono) VALUES ('')")
-                            cursor.execute("SELECT MAX(IDTelefonoClientes) FROM TelefonoCliente")
-                            id_telefono = cursor.fetchone()[0]
-                        
-                        # Insertar cliente
-                        cursor.execute(
-                            """INSERT INTO Clientes 
-                            (NumeroDeMesa, IDTelefonoClientes, Nombre1, Apellido1) 
-                            VALUES (?, ?, ?, ?)""",
-                            (int(mesa_cliente) if mesa_cliente.isdigit() else int(mesa), 
-                            id_telefono, nombre, apellido)
-                        )
-                        cursor.execute("SELECT MAX(IDClientes) FROM Clientes")
-                        nuevo_id_cliente = cursor.fetchone()[0]
-                        
-                    elif opcion_cliente.get() == "seleccionar":
-                        cliente_seleccionado = cmb_cliente_existente.get()
-                        if cliente_seleccionado and cliente_seleccionado != "No hay clientes registrados":
-                            # Buscar el ID del cliente por nombre
-                            for id_cli, info in clientes_registrados.items():
-                                if info["nombre"] == cliente_seleccionado:
-                                    nuevo_id_cliente = id_cli
-                                    break
-                    
-                    # Actualizar venta principal
-                    cursor.execute(
-                        """UPDATE Venta 
-                        SET MontoTotal = ? 
-                        WHERE IDVentas = ?""",
-                        (total_venta, id_venta)
-                    )
-                    
-                    # Eliminar productos antiguos
-                    cursor.execute(
-                        "DELETE FROM VentasClientesMenuBebidasMenuPlatos WHERE IDVentas = ?",
-                        (id_venta,)
-                    )
-                    
-                    # Insertar nuevos productos
-                    for prod in productos_venta:
-                        if prod["tipo"] == "Plato":
-                            cursor.execute(
-                                """INSERT INTO VentasClientesMenuBebidasMenuPlatos 
-                                (IDVentas, Cantidad, NombrePlato, Precio) 
-                                VALUES (?, ?, ?, ?)""",
-                                (id_venta, prod["cantidad"], prod["nombre"], prod["precio_unitario"])
-                            )
-                        else:  # Bebida
-                            cursor.execute(
-                                """INSERT INTO VentasClientesMenuBebidasMenuPlatos 
-                                (IDVentas, Cantidad, NombreBebida, Precio) 
-                                VALUES (?, ?, ?, ?)""",
-                                (id_venta, prod["cantidad"], prod["nombre"], prod["precio_unitario"])
-                            )
-                    
-                    # Actualizar cliente si es necesario
-                    cursor.execute(
-                        """UPDATE VentasClientesMenuBebidasMenuPlatos 
-                        SET IDClientes = ? 
-                        WHERE IDVentas = ?""",
-                        (nuevo_id_cliente, id_venta)
-                    )
-                    
-                    conexion.commit()
-                    
-                    msg.showinfo("Éxito", f"Venta #{id_venta} actualizada correctamente.\nTotal: C$ {total_venta:.2f}")
-                    
-                    # Actualizar vistas
-                    cargar_ventas()
-                    ventana.destroy()
-                    
-                except Exception as e:
-                    conexion.rollback()
-                    msg.showerror("Error", f"No se pudo actualizar la venta:\n{str(e)}")
-            
-            # Función para cancelar
-            def cancelar_edicion():
-                respuesta = msg.askyesno("Cancelar", 
-                                        "¿Está seguro de cancelar la edición?\nLos cambios no guardados se perderán.")
-                if respuesta:
-                    ventana.destroy()
-            
-            # -------------------------------------------------
-            # CREAR LOS BOTONES
-            # -------------------------------------------------
-            
-            # Botón para agregar producto
-            btn_agregar_producto = tk.Button(
-                control_frame,
-                text="➕ Agregar a la venta",
-                bg="#CFE5C8",
-                fg="#333333",
-                font=("Segoe UI", 9, "bold"),
-                relief="flat",
-                padx=10,
-                pady=4,
-                command=agregar_producto_venta
-            )
-            btn_agregar_producto.grid(row=0, column=7, sticky="w", padx=10)
-            
-            # Botón para eliminar producto seleccionado
-            btn_eliminar_producto = tk.Button(
-                productos_frame,
-                text="🗑️ Eliminar producto seleccionado",
-                bg="#F2B6B6",
-                fg="#333333",
-                font=("Segoe UI", 9, "bold"),
-                relief="flat",
-                padx=10,
-                pady=4,
-                command=eliminar_producto_seleccionado
-            )
-            btn_eliminar_producto.pack(anchor="e", padx=15, pady=(0, 10))
-            
-            # Botones finales
-            btn_cancelar = tk.Button(
-                botones_frame,
-                text="❌ Cancelar",
-                bg="#F2B6B6",
-                fg="#333333",
-                font=("Segoe UI", 11, "bold"),
-                relief="flat",
-                padx=20,
-                pady=8,
-                command=cancelar_edicion
-            )
-            btn_cancelar.pack(side="left", padx=5)
-            
-            btn_guardar = tk.Button(
-                botones_frame,
-                text="💾 Guardar Cambios",
-                bg="#4A90E2",
-                fg="#FFFFFF",
-                font=("Segoe UI", 11, "bold"),
-                relief="flat",
-                padx=20,
-                pady=8,
-                command=guardar_cambios
-            )
-            btn_guardar.pack(side="right", padx=5)
-            
-            ventana.transient(self)
-            ventana.grab_set()
+                msg.showerror("Error", f"No se pudieron cargar las ventas:\n{e}")
 
         # -------------------------------------------------
-        # AGREGAR NUEVA VENTA (Ventana completa)
+        # FUNCIÓN: aplicar filtro
+        # -------------------------------------------------
+        def aplicar_filtro():
+            f1 = entry_fecha_desde.get().strip()
+            f2 = entry_fecha_hasta.get().strip()
+
+            if f1 != "dd/mm/aaaa" and not validar_formato_fecha(f1):
+                msg.showwarning("Advertencia","Fecha 'Desde' inválida.")
+                return
+
+            if f2 != "dd/mm/aaaa" and not validar_formato_fecha(f2):
+                msg.showwarning("Advertencia","Fecha 'Hasta' inválida.")
+                return
+
+            cargar_ventas(f1, f2)
+
+        # -------------------------------------------------
+        # FUNCIÓN: limpiar filtro
+        # -------------------------------------------------
+        def limpiar_filtro():
+            entry_fecha_desde.delete(0, tk.END)
+            entry_fecha_hasta.delete(0, tk.END)
+            entry_fecha_desde.insert(0, "dd/mm/aaaa")
+            entry_fecha_hasta.insert(0, "dd/mm/aaaa")
+            cargar_ventas()
+
+        # -------------------------------------------------
+        # FUNCIÓN: eliminar venta
+        # -------------------------------------------------
+        def eliminar_venta():
+            sel = tree.selection()
+            if not sel:
+                msg.showwarning("Atención","Seleccione una venta.")
+                return
+
+            id_venta = int(tree.item(sel)["values"][0])
+
+            if not msg.askyesno("Confirmar","¿Eliminar esta venta?"):
+                return
+
+            try:
+                cursor.execute("DELETE FROM VentasClientesMenuBebidasMenuPlatos WHERE IDVentas=?", (id_venta,))
+                cursor.execute("DELETE FROM Venta WHERE IDVentas=?", (id_venta,))
+                conexion.commit()
+                cargar_ventas()
+                msg.showinfo("Éxito","Venta eliminada.")
+            except Exception as e:
+                conexion.rollback()
+                msg.showerror("Error", f"No se pudo eliminar:\n{e}")
+
+        # -------------------------------------------------
+        # BOTONES BÁSICOS
+        # -------------------------------------------------
+        btn_filtrar.config(command=aplicar_filtro)
+        btn_limpiar_filtro.config(command=limpiar_filtro)
+        btn_eliminar.config(command=eliminar_venta)
+
+        # ---------- cargar ventas al iniciar ----------
+        cargar_ventas()
+
+        # -------------------------------------------------
+        # FUNCIÓN: AGREGAR NUEVA VENTA (ABRIR VENTANA)
         # -------------------------------------------------
         def agregar_venta():
-            """Abre una ventana completa para crear una nueva venta."""
+            abrir_ventana_edicion_agregar(modo="agregar")
+
+        # -------------------------------------------------
+        # FUNCIÓN: EDITAR VENTA (ABRIR VENTANA)
+        # -------------------------------------------------
+        def editar_venta():
+            sel = tree.selection()
+            if not sel:
+                msg.showwarning("Atención", "Seleccione una venta para editar.")
+                return
+
+            id_venta = int(tree.item(sel)["values"][0])
+            abrir_ventana_edicion_agregar(modo="editar", id_venta=id_venta)
+
+        # -------------------------------------------------
+        # FUNCIÓN PRINCIPAL: VENTANA AGREGAR / EDITAR VENTA
+        # -------------------------------------------------
+        def abrir_ventana_edicion_agregar(modo="agregar", id_venta=None):
             ventana = tk.Toplevel(self)
-            ventana.title("Nueva Venta")
             ventana.configure(bg="#F5F1E8")
-            ventana.geometry("1000x750")
             
-            # Centrar ventana
-            ventana.update_idletasks()
-            sw = ventana.winfo_screenwidth()
-            sh = ventana.winfo_screenheight()
-            ww = ventana.winfo_width()
-            wh = ventana.winfo_height()
-            x = (sw // 2) - (ww // 2)
-            y = (sh // 2) - (wh // 2)
-            ventana.geometry(f"{ww}x{wh}+{x}+{y}")
+            if modo == "editar":
+                ventana.title(f"Editar Venta #{id_venta}")
+                ventana.geometry("700x600")
+                
+                # Cargar datos existentes
+                try:
+                    cursor.execute("""
+                        SELECT 
+                            V.IDVentas,
+                            V.Dia, V.Mes, V.Ano,
+                            V.MontoTotal,
+                            V.Hora,
+                            VC.IDClientes,
+                            C.NumeroDeMesa,
+                            CONCAT(C.Nombre1,' ',C.Apellido1)
+                        FROM Venta V
+                        LEFT JOIN VentasClientesMenuBebidasMenuPlatos VC ON VC.IDVentas = V.IDVentas
+                        LEFT JOIN Clientes C ON C.IDClientes = VC.IDClientes
+                        WHERE V.IDVentas = ?
+                    """, (id_venta,))
+                    venta_data = cursor.fetchone()
 
-            # --- Variables de la ventana ---
+                    cursor.execute("""
+                        SELECT 
+                            NombrePlato, NombreBebida, Cantidad, Precio,
+                            IDMenuPlatos, IDMenuBebidas
+                        FROM VentasClientesMenuBebidasMenuPlatos
+                        WHERE IDVentas = ?
+                    """, (id_venta,))
+                    productos_existentes = cursor.fetchall()
 
-# --- Variables de la ventana ---
-            productos_venta = []  # Lista de productos en esta venta
-            total_venta_var = tk.DoubleVar(value=0.0)  # Usar tk.DoubleVar para manejar el total
-            id_cliente_venta = None
-            
-            # --- Frame principal con scroll ---
+                except Exception as e:
+                    msg.showerror("Error", f"No se pudieron cargar datos:\n{e}")
+                    ventana.destroy()
+                    return
+            else:
+                ventana.title("Nueva Venta")
+                ventana.geometry("600x700")
+                venta_data = None
+                productos_existentes = []
+
+            ventana.transient(self)
+            ventana.grab_set()
+
+            # --- Variables internas ---
+            productos_venta = []
+            total_venta_var = tk.DoubleVar(value=0.0)
+
+            # -------------------------------------------------
+            # CONTAINER PRINCIPAL CON SCROLL
+            # -------------------------------------------------
             main_container = tk.Frame(ventana, bg="#F5F1E8")
             main_container.pack(fill="both", expand=True, padx=10, pady=10)
-            
-            # Canvas para scroll
+
             canvas = tk.Canvas(main_container, bg="#F5F1E8", highlightthickness=0)
             scrollbar = ttk.Scrollbar(main_container, orient="vertical", command=canvas.yview)
             scrollable_frame = tk.Frame(canvas, bg="#F5F1E8")
-            
+
             scrollable_frame.bind(
                 "<Configure>",
                 lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
             )
-            
+
             canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
             canvas.configure(yscrollcommand=scrollbar.set)
-            
+
+            # Empacar
             canvas.pack(side="left", fill="both", expand=True)
             scrollbar.pack(side="right", fill="y")
 
-            # Cargar información de productos desde la base de datos
-            productos_disponibles = {"Plato": {}, "Bebida": {}}
-            
-            # Cargar clientes registrados
-            clientes_registrados = {}
-            
-            try:
-                # Cargar platos
-                cursor.execute("""
-                    SELECT 
-                        P.IDProduccion,
-                        P.NombrePlato,
-                        ISNULL(P.PrecioVenta, ISNULL(P.CostoPorPlato, 0)) as Precio,
-                        ISNULL(P.CantidadDePlatos, 0) as Stock
-                    FROM Produccion P
-                    WHERE P.NombrePlato IS NOT NULL 
-                    AND P.NombrePlato != ''
-                    AND ISNULL(P.CantidadDePlatos, 0) > 0
-                    ORDER BY P.NombrePlato
-                """)
-                
-                for row in cursor.fetchall():
-                    id_prod, nombre, precio, stock = row
-                    productos_disponibles["Plato"][nombre] = {
-                        "id": id_prod,
-                        "precio": float(precio),
-                        "stock": int(stock)
-                    }
-                
-                # Cargar bebidas
-                cursor.execute("""
-                    SELECT 
-                        P.IDProduccion,
-                        P.NombreBebida,
-                        ISNULL(P.PrecioVenta, ISNULL(P.CostoPorBebida, 0)) as Precio,
-                        ISNULL(P.CantidadDeBebidas, 0) as Stock
-                    FROM Produccion P
-                    WHERE P.NombreBebida IS NOT NULL 
-                    AND P.NombreBebida != ''
-                    AND ISNULL(P.CantidadDeBebidas, 0) > 0
-                    ORDER BY P.NombreBebida
-                """)
-                
-                for row in cursor.fetchall():
-                    id_prod, nombre, precio, stock = row
-                    productos_disponibles["Bebida"][nombre] = {
-                        "id": id_prod,
-                        "precio": float(precio),
-                        "stock": int(stock)
-                    }
-                    
-                # Cargar clientes registrados
-                cursor.execute("""
-                    SELECT 
-                        C.IDClientes,
-                        C.Nombre1,
-                        C.Apellido1,
-                        C.NumeroDeMesa,
-                        T.Telefono
-                    FROM Clientes C
-                    LEFT JOIN TelefonoCliente T ON C.IDTelefonoClientes = T.IDTelefonoClientes
-                    ORDER BY C.Nombre1, C.Apellido1
-                """)
-                
-                for row in cursor.fetchall():
-                    id_cliente, nombre, apellido, mesa, telefono = row
-                    nombre_completo = f"{nombre} {apellido}"
-                    clientes_registrados[id_cliente] = {
-                        "nombre": nombre_completo,
-                        "mesa": mesa,
-                        "telefono": telefono if telefono else "Sin teléfono"
-                    }
-                    
-            except Exception as e:
-                msg.showerror("Error", f"No se pudieron cargar los datos:\n{e}")
-                ventana.destroy()
-                return
+            # -------------------------------------------------
+            # TÍTULO
+            # -------------------------------------------------
+            titulo_frame = tk.Frame(scrollable_frame, bg="#F5F1E8")
+            titulo_frame.pack(fill="x", pady=(0, 10))
 
-            # --- Sección 1: Información de la mesa y cliente ---
-            info_frame = tk.Frame(scrollable_frame, bg="#FDF7EA", bd=2, relief="solid")
-            info_frame.pack(fill="x", padx=5, pady=(0, 15))
-            
-            tk.Label(
-                info_frame,
-                text="📋 Información de la Venta",
-                bg="#FDF7EA",
-                fg="#333333",
-                font=("Segoe UI", 12, "bold")
-            ).pack(anchor="w", padx=15, pady=(10, 5))
-            
-            # Número de mesa
-            mesa_frame = tk.Frame(info_frame, bg="#FDF7EA")
+            titulo_texto = "📝 Editar Venta" if modo == "editar" else "🛒 Nueva Venta"
+            tk.Label(titulo_frame, text=titulo_texto, bg="#F5F1E8",
+                    font=("Segoe UI", 16, "bold"), fg="#2C3E50").pack()
+
+            # -------------------------------------------------
+            # SECCIÓN 1: INFORMACIÓN DE LA VENTA
+            # -------------------------------------------------
+            info_frame = tk.Frame(scrollable_frame, bg="#FFFFFF", bd=1, relief="solid")
+            info_frame.pack(fill="x", pady=(0, 15))
+
+            tk.Label(info_frame, text="Información de la Venta", bg="#FFFFFF",
+                    font=("Segoe UI", 12, "bold"), fg="#34495E").pack(anchor="w", padx=15, pady=10)
+
+            # --- Número de Mesa ---
+            mesa_frame = tk.Frame(info_frame, bg="#FFFFFF")
             mesa_frame.pack(fill="x", padx=15, pady=(0, 10))
-            
-            tk.Label(mesa_frame, text="Número de Mesa*:", bg="#FDF7EA", 
-                    font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="e", padx=5)
-            
+
+            tk.Label(mesa_frame, text="Número de Mesa*:", bg="#FFFFFF",
+                    font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w", padx=(0, 10))
+
             entry_mesa = tk.Entry(mesa_frame, font=("Segoe UI", 10), width=15)
-            entry_mesa.grid(row=0, column=1, sticky="w", padx=5)
-            entry_mesa.insert(0, "1")
+            entry_mesa.grid(row=0, column=1, sticky="w")
             
-            # Opción de cliente
-            cliente_frame = tk.Frame(info_frame, bg="#FDF7EA")
-            cliente_frame.pack(fill="x", padx=15, pady=(0, 10))
+            if modo == "editar" and venta_data and venta_data[7]:
+                entry_mesa.insert(0, str(venta_data[7]))
+            else:
+                entry_mesa.insert(0, "1")
+
+            # -------------------------------------------------
+            # SECCIÓN 2: CLIENTE
+            # -------------------------------------------------
+            cliente_frame = tk.Frame(scrollable_frame, bg="#FFFFFF", bd=1, relief="solid")
+            cliente_frame.pack(fill="x", pady=(0, 15))
+
+            tk.Label(cliente_frame, text="Cliente", bg="#FFFFFF",
+                    font=("Segoe UI", 12, "bold"), fg="#34495E").pack(anchor="w", padx=15, pady=10)
+
+            # --- Radio Buttons para tipo de cliente ---
+            cliente_opcion = tk.StringVar(value="ocasional")
+
+            if modo == "editar" and venta_data and venta_data[6]:
+                cliente_opcion.set("seleccionar")
+
+            rb_frame = tk.Frame(cliente_frame, bg="#FFFFFF")
+            rb_frame.pack(fill="x", padx=15, pady=(0, 10))
+
+            rb_ocasional = tk.Radiobutton(rb_frame, text="Cliente ocasional",
+                                        variable=cliente_opcion, value="ocasional",
+                                        bg="#FFFFFF", font=("Segoe UI", 10))
+            rb_ocasional.grid(row=0, column=0, padx=(0, 20))
+
+            rb_nuevo = tk.Radiobutton(rb_frame, text="Registrar nuevo cliente",
+                                    variable=cliente_opcion, value="registrar",
+                                    bg="#FFFFFF", font=("Segoe UI", 10))
+            rb_nuevo.grid(row=0, column=1, padx=(0, 20))
+
+            rb_existente = tk.Radiobutton(rb_frame, text="Seleccionar cliente existente",
+                                        variable=cliente_opcion, value="seleccionar",
+                                        bg="#FFFFFF", font=("Segoe UI", 10))
+            rb_existente.grid(row=0, column=2)
+
+            # --- Campos para nuevo cliente ---
+            nuevo_cliente_frame = tk.Frame(cliente_frame, bg="#FFFFFF")
             
-            tk.Label(cliente_frame, text="Cliente:", bg="#FDF7EA",
-                    font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="e", padx=5)
+            tk.Label(nuevo_cliente_frame, text="Nombre:", bg="#FFFFFF").grid(row=0, column=0, padx=5, pady=5)
+            entry_nombre = tk.Entry(nuevo_cliente_frame, width=25)
+            entry_nombre.grid(row=0, column=1, padx=5, pady=5)
             
-            # Frame para opciones de cliente
-            cliente_opciones_frame = tk.Frame(cliente_frame, bg="#FDF7EA")
-            cliente_opciones_frame.grid(row=0, column=1, sticky="w", padx=5)
+            tk.Label(nuevo_cliente_frame, text="Apellido:", bg="#FFFFFF").grid(row=0, column=2, padx=5, pady=5)
+            entry_apellido = tk.Entry(nuevo_cliente_frame, width=25)
+            entry_apellido.grid(row=0, column=3, padx=5, pady=5)
             
-            # Variable para opción de cliente
-            opcion_cliente = tk.StringVar(value="ocasional")
+            tk.Label(nuevo_cliente_frame, text="Teléfono:", bg="#FFFFFF").grid(row=1, column=0, padx=5, pady=5)
+            entry_telefono = tk.Entry(nuevo_cliente_frame, width=25)
+            entry_telefono.grid(row=1, column=1, padx=5, pady=5)
+
+            # --- Combobox para cliente existente ---
+            existente_cliente_frame = tk.Frame(cliente_frame, bg="#FFFFFF")
             
-            # Radio buttons para tipo de cliente
-            rb_ocasional = tk.Radiobutton(
-                cliente_opciones_frame,
-                text="Cliente ocasional",
-                variable=opcion_cliente,
-                value="ocasional",
-                bg="#FDF7EA",
-                font=("Segoe UI", 9),
-                command=lambda: toggle_cliente_fields("ocasional")
-            )
-            rb_ocasional.pack(side="left", padx=(0, 15))
-            
-            rb_registrar = tk.Radiobutton(
-                cliente_opciones_frame,
-                text="Registrar nuevo cliente",
-                variable=opcion_cliente,
-                value="registrar",
-                bg="#FDF7EA",
-                font=("Segoe UI", 9),
-                command=lambda: toggle_cliente_fields("registrar")
-            )
-            rb_registrar.pack(side="left", padx=(0, 15))
-            
-            rb_seleccionar = tk.Radiobutton(
-                cliente_opciones_frame,
-                text="Seleccionar cliente existente",
-                variable=opcion_cliente,
-                value="seleccionar",
-                bg="#FDF7EA",
-                font=("Segoe UI", 9),
-                command=lambda: toggle_cliente_fields("seleccionar")
-            )
-            rb_seleccionar.pack(side="left")
-            
-            # Frame para campos de cliente (inicialmente oculto)
-            campos_cliente_frame = tk.Frame(info_frame, bg="#FDF7EA")
-            
-            # Frame para seleccionar cliente existente (inicialmente oculto)
-            seleccionar_cliente_frame = tk.Frame(info_frame, bg="#FDF7EA")
-            
-            def toggle_cliente_fields(opcion):
-                if opcion == "registrar":
-                    campos_cliente_frame.pack(fill="x", padx=15, pady=(5, 10))
-                    seleccionar_cliente_frame.pack_forget()
-                    # Actualizar mesa automáticamente
-                    mesa = entry_mesa.get().strip()
-                    if mesa.isdigit():
-                        entry_mesa_cliente.delete(0, tk.END)
-                        entry_mesa_cliente.insert(0, mesa)
-                elif opcion == "seleccionar":
-                    seleccionar_cliente_frame.pack(fill="x", padx=15, pady=(5, 10))
-                    campos_cliente_frame.pack_forget()
-                    cargar_lista_clientes()
-                else:  # ocasional
-                    campos_cliente_frame.pack_forget()
-                    seleccionar_cliente_frame.pack_forget()
-            
-            # Campos para nuevo cliente
-            tk.Label(campos_cliente_frame, text="Nombre*:", bg="#FDF7EA").grid(row=0, column=0, sticky="e", padx=5, pady=2)
-            entry_nombre_cliente = tk.Entry(campos_cliente_frame, width=25)
-            entry_nombre_cliente.grid(row=0, column=1, sticky="w", padx=5, pady=2)
-            
-            tk.Label(campos_cliente_frame, text="Apellido*:", bg="#FDF7EA").grid(row=0, column=2, sticky="e", padx=5, pady=2)
-            entry_apellido_cliente = tk.Entry(campos_cliente_frame, width=25)
-            entry_apellido_cliente.grid(row=0, column=3, sticky="w", padx=5, pady=2)
-            
-            tk.Label(campos_cliente_frame, text="Teléfono:", bg="#FDF7EA").grid(row=1, column=0, sticky="e", padx=5, pady=2)
-            entry_telefono_cliente = tk.Entry(campos_cliente_frame, width=25)
-            entry_telefono_cliente.grid(row=1, column=1, sticky="w", padx=5, pady=2)
-            
-            tk.Label(campos_cliente_frame, text="Mesa:", bg="#FDF7EA").grid(row=1, column=2, sticky="e", padx=5, pady=2)
-            entry_mesa_cliente = tk.Entry(campos_cliente_frame, width=10)
-            entry_mesa_cliente.grid(row=1, column=3, sticky="w", padx=5, pady=2)
-            
-            # Sincronizar mesa principal con mesa del cliente
-            def sincronizar_mesa(*args):
-                if opcion_cliente.get() == "registrar":
-                    mesa = entry_mesa.get().strip()
-                    if mesa.isdigit():
-                        entry_mesa_cliente.delete(0, tk.END)
-                        entry_mesa_cliente.insert(0, mesa)
-            
-            entry_mesa.bind("<KeyRelease>", sincronizar_mesa)
-            
-            campos_cliente_frame.columnconfigure(1, weight=1)
-            campos_cliente_frame.columnconfigure(3, weight=1)
-            
-            # Frame para seleccionar cliente existente
-            tk.Label(seleccionar_cliente_frame, text="Cliente existente:", bg="#FDF7EA",
-                    font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="e", padx=5, pady=2)
-            
-            # Combobox para seleccionar cliente
-            cmb_cliente_existente = ttk.Combobox(seleccionar_cliente_frame, 
-                                                state="readonly", 
-                                                width=40,
-                                                font=("Segoe UI", 9))
-            cmb_cliente_existente.grid(row=0, column=1, sticky="w", padx=5, pady=2)
-            
-            # Botón para refrescar lista de clientes
-            btn_refrescar_clientes = tk.Button(
-                seleccionar_cliente_frame,
-                text="🔄",
-                bg="#E5D8B4",
-                fg="#333333",
-                font=("Segoe UI", 9),
-                relief="flat",
-                width=3,
-                command=lambda: cargar_lista_clientes()
-            )
-            btn_refrescar_clientes.grid(row=0, column=2, sticky="w", padx=(5, 0))
-            
-            # Información del cliente seleccionado
-            lbl_info_cliente = tk.Label(seleccionar_cliente_frame, 
-                                    text="",
-                                    bg="#FDF7EA",
-                                    fg="#555555",
-                                    font=("Segoe UI", 9),
-                                    justify="left")
-            lbl_info_cliente.grid(row=1, column=0, columnspan=3, sticky="w", padx=5, pady=(5, 0))
-            
-            def cargar_lista_clientes():
-                """Carga la lista de clientes en el combobox."""
-                if clientes_registrados:
-                    # Crear lista de nombres de clientes (SOLO NOMBRE)
-                    lista_clientes = []
-                    for id_cliente, info in clientes_registrados.items():
-                        lista_clientes.append(info['nombre'])
-                    
-                    cmb_cliente_existente["values"] = lista_clientes
-                    if lista_clientes:
-                        cmb_cliente_existente.set(lista_clientes[0])
-                        mostrar_info_cliente(lista_clientes[0])
-                else:
-                    cmb_cliente_existente["values"] = ["No hay clientes registrados"]
-                    cmb_cliente_existente.set("No hay clientes registrados")
-                    lbl_info_cliente.config(text="")
-            
-            def mostrar_info_cliente(cliente_seleccionado):
-                """Muestra la información del cliente seleccionado."""
-                # Buscar el cliente en el diccionario por nombre completo
-                for id_cliente, info in clientes_registrados.items():
-                    if info["nombre"] == cliente_seleccionado:
-                        info_text = f"Mesa: {info['mesa']} | Teléfono: {info['telefono']}"
-                        lbl_info_cliente.config(text=info_text)
-                        
-                        # Actualizar número de mesa principal
-                        entry_mesa.delete(0, tk.END)
-                        entry_mesa.insert(0, str(info["mesa"]))
-                        break
-            
-            cmb_cliente_existente.bind("<<ComboboxSelected>>", 
-                                    lambda e: mostrar_info_cliente(cmb_cliente_existente.get()))
-            
-            # --- Sección 2: Agregar productos ---
-            productos_frame = tk.Frame(scrollable_frame, bg="#FDF7EA", bd=2, relief="solid")
-            productos_frame.pack(fill="x", padx=5, pady=(0, 15))
-            
-            tk.Label(
-                productos_frame,
-                text="🛒 Agregar Productos",
-                bg="#FDF7EA",
-                fg="#333333",
-                font=("Segoe UI", 12, "bold")
-            ).pack(anchor="w", padx=15, pady=(10, 5))
-            
-            # Controles para agregar producto
-            control_frame = tk.Frame(productos_frame, bg="#FDF7EA")
+            tk.Label(existente_cliente_frame, text="Seleccionar cliente:", bg="#FFFFFF").grid(row=0, column=0, padx=5, pady=5)
+            cmb_cliente = ttk.Combobox(existente_cliente_frame, state="readonly", width=40)
+            cmb_cliente.grid(row=0, column=1, padx=5, pady=5)
+
+            # Cargar clientes
+            try:
+                cursor.execute("SELECT IDClientes, Nombre1, Apellido1 FROM Clientes")
+                clientes = cursor.fetchall()
+                cmb_cliente['values'] = [f"{c[1]} {c[2]}" for c in clientes]
+                if clientes:
+                    cmb_cliente.set(f"{clientes[0][1]} {clientes[0][2]}")
+            except:
+                pass
+
+            # Función para mostrar/ocultar frames según opción
+            def mostrar_frame_cliente():
+                nuevo_cliente_frame.pack_forget()
+                existente_cliente_frame.pack_forget()
+                
+                if cliente_opcion.get() == "registrar":
+                    nuevo_cliente_frame.pack(fill="x", padx=15, pady=(0, 10))
+                elif cliente_opcion.get() == "seleccionar":
+                    existente_cliente_frame.pack(fill="x", padx=15, pady=(0, 10))
+
+            cliente_opcion.trace("w", lambda *args: mostrar_frame_cliente())
+            mostrar_frame_cliente()
+
+            # -------------------------------------------------
+            # SECCIÓN 3: PRODUCTOS DE LA VENTA
+            # -------------------------------------------------
+            productos_frame = tk.Frame(scrollable_frame, bg="#FFFFFF", bd=1, relief="solid")
+            productos_frame.pack(fill="x", pady=(0, 15))
+
+            tk.Label(productos_frame, text="Productos de la Venta", bg="#FFFFFF",
+                    font=("Segoe UI", 12, "bold"), fg="#34495E").pack(anchor="w", padx=15, pady=10)
+
+            # --- Controles de selección de productos ---
+            control_frame = tk.Frame(productos_frame, bg="#FFFFFF")
             control_frame.pack(fill="x", padx=15, pady=(0, 10))
-            
-            # Tipo de producto
-            tk.Label(control_frame, text="Tipo:", bg="#FDF7EA", 
-                    font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="e", padx=5)
-            
-            cmb_tipo = ttk.Combobox(control_frame, values=["Plato", "Bebida"], 
-                                    state="readonly", width=12, font=("Segoe UI", 9))
-            cmb_tipo.grid(row=0, column=1, sticky="w", padx=5)
+
+            tk.Label(control_frame, text="Tipo:", bg="#FFFFFF").grid(row=0, column=0, padx=5)
+            cmb_tipo = ttk.Combobox(control_frame, values=["Plato", "Bebida"], state="readonly", width=15)
+            cmb_tipo.grid(row=0, column=1, padx=5)
             cmb_tipo.set("Plato")
-            
-            # Producto
-            tk.Label(control_frame, text="Producto:", bg="#FDF7EA",
-                    font=("Segoe UI", 9, "bold")).grid(row=0, column=2, sticky="e", padx=5)
-            
-            cmb_producto = ttk.Combobox(control_frame, state="readonly", 
-                                        width=35, font=("Segoe UI", 9))
-            cmb_producto.grid(row=0, column=3, sticky="ew", padx=5)
-            
-            # Cantidad
-            tk.Label(control_frame, text="Cantidad:", bg="#FDF7EA",
-                    font=("Segoe UI", 9, "bold")).grid(row=0, column=4, sticky="e", padx=5)
-            
-            spin_cantidad = tk.Spinbox(control_frame, from_=1, to=100, width=8, 
-                                    font=("Segoe UI", 9))
-            spin_cantidad.grid(row=0, column=5, sticky="w", padx=5)
-            
-            # Etiqueta para mostrar stock
-            lbl_stock = tk.Label(control_frame, 
-                                text="Stock: 0",
-                                bg="#FDF7EA",
-                                fg="#666666",
-                                font=("Segoe UI", 9))
-            lbl_stock.grid(row=0, column=6, sticky="w", padx=10)
-            
-            control_frame.columnconfigure(3, weight=1)
-            
-            # Función para actualizar productos según tipo
-            def actualizar_productos(*args):
-                tipo = cmb_tipo.get()
-                if tipo in productos_disponibles:
-                    productos = list(productos_disponibles[tipo].keys())
-                    cmb_producto["values"] = productos
-                    if productos:
-                        cmb_producto.set(productos[0])
-                        # Actualizar información de stock
-                        actualizar_info_stock(productos[0])
-                else:
-                    cmb_producto["values"] = []
-                    cmb_producto.set("")
-                    lbl_stock.config(text="Stock: 0")
-            
-            # Función para actualizar información de stock
-            def actualizar_info_stock(producto_seleccionado):
-                tipo = cmb_tipo.get()
-                if tipo in productos_disponibles and producto_seleccionado in productos_disponibles[tipo]:
-                    stock = productos_disponibles[tipo][producto_seleccionado]["stock"]
+
+            tk.Label(control_frame, text="Producto:", bg="#FFFFFF").grid(row=0, column=2, padx=5)
+            cmb_producto = ttk.Combobox(control_frame, state="readonly", width=30)
+            cmb_producto.grid(row=0, column=3, padx=5)
+
+            tk.Label(control_frame, text="Cantidad:", bg="#FFFFFF").grid(row=0, column=4, padx=5)
+            spin_cantidad = tk.Spinbox(control_frame, from_=1, to=100, width=10)
+            spin_cantidad.grid(row=0, column=5, padx=5)
+
+            lbl_stock = tk.Label(control_frame, text="Stock: 0", bg="#FFFFFF")
+            lbl_stock.grid(row=0, column=6, padx=10)
+
+            # Cargar productos disponibles
+            productos_disponibles = {"Plato": [], "Bebida": []}
+            def cargar_productos():
+                try:
+                    # Platos
+                    cursor.execute("SELECT P.NombrePlato, P.CantidadDePlatos FROM Produccion P INNER JOIN MenuDePlatos M ON M.IDProduccion = P.IDProduccion")
+                    platos = cursor.fetchall()
+                    productos_disponibles["Plato"] = platos
                     
-                    # Cambiar color según stock disponible
-                    if stock <= 0:
-                        lbl_stock.config(text=f"Stock: {stock} (AGOTADO)", fg="#FF0000")
-                    elif stock <= 5:
-                        lbl_stock.config(text=f"Stock: {stock} (BAJO)", fg="#FFA500")
-                    else:
-                        lbl_stock.config(text=f"Stock: {stock}", fg="#008000")
-                else:
-                    lbl_stock.config(text="Stock: 0", fg="#666666")
-            
-            # Función para verificar stock antes de agregar
-            def verificar_stock_antes_agregar():
+                    # Bebidas
+                    cursor.execute("SELECT P.NombreBebida, P.CantidadDeBebidas FROM Produccion P INNER JOIN MenuDeBebidas M ON M.IDProduccion = P.IDProduccion")
+                    bebidas = cursor.fetchall()
+                    productos_disponibles["Bebida"] = bebidas
+                    
+                    actualizar_lista_productos()
+                except Exception as e:
+                    print(f"Error cargando productos: {e}")
+
+            def actualizar_lista_productos():
                 tipo = cmb_tipo.get()
-                producto = cmb_producto.get()
-                cantidad_str = spin_cantidad.get()
-                
-                if not tipo or not producto:
-                    msg.showwarning("Atención", "Seleccione tipo y producto.")
-                    return False
-                
-                if not cantidad_str.isdigit():
-                    msg.showwarning("Atención", "Ingrese una cantidad válida.")
-                    return False
-                
-                cantidad = int(cantidad_str)
-                
-                if cantidad <= 0:
-                    msg.showwarning("Atención", "La cantidad debe ser mayor a 0.")
-                    return False
-                
-                # Verificar stock
-                if producto in productos_disponibles[tipo]:
-                    info = productos_disponibles[tipo][producto]
-                    
-                    # Verificación adicional
-                    if cantidad > info["stock"]:
-                        msg.showwarning("Stock insuficiente", 
-                                    f"No hay suficiente stock disponible.\n"
-                                    f"Stock actual: {info['stock']}\n"
-                                    f"Cantidad solicitada: {cantidad}\n"
-                                    f"Faltan: {cantidad - info['stock']} unidades")
-                        return False
-                    
-                    # Verificar si ya está en la lista de productos
-                    for prod in productos_venta:
-                        if prod["nombre"] == producto and prod["tipo"] == tipo:
-                            total_cantidad = prod["cantidad"] + cantidad
-                            if total_cantidad > info["stock"]:
-                                msg.showwarning("Stock insuficiente", 
-                                            f"Ya tiene {prod['cantidad']} unidades en la venta.\n"
-                                            f"Stock total disponible: {info['stock']}\n"
-                                            f"Total solicitado: {total_cantidad}\n"
-                                            f"Faltan: {total_cantidad - info['stock']} unidades")
-                                return False
-                            break
-                    
-                    return True
-                else:
-                    msg.showerror("Error", "Producto no encontrado.")
-                    return False
-            
-            cmb_tipo.bind("<<ComboboxSelected>>", actualizar_productos)
-            cmb_producto.bind("<<ComboboxSelected>>", 
-                            lambda e: actualizar_info_stock(cmb_producto.get()))
-            
-            actualizar_productos()  # Inicializar
-            
-            # Treeview para productos de la venta
-            tree_productos_frame = tk.Frame(productos_frame, bg="#FDF7EA")
-            tree_productos_frame.pack(fill="both", expand=True, padx=15, pady=(0, 10))
-            
-            # Crear treeview para productos
-            tree_productos = ttk.Treeview(
-                tree_productos_frame,
-                columns=("Producto", "Cantidad", "Precio Unitario", "Subtotal"),
-                show="headings",
-                height=6
-            )
-            
-            # Configurar columnas
-            tree_productos.heading("Producto", text="Producto")
-            tree_productos.heading("Cantidad", text="Cantidad")
-            tree_productos.heading("Precio Unitario", text="Precio Unitario")
-            tree_productos.heading("Subtotal", text="Subtotal")
-            
-            tree_productos.column("Producto", width=250, anchor="w")
-            tree_productos.column("Cantidad", width=80, anchor="center")
-            tree_productos.column("Precio Unitario", width=120, anchor="e")
-            tree_productos.column("Subtotal", width=120, anchor="e")
-            
-            # Scrollbar
-            scroll_productos = ttk.Scrollbar(tree_productos_frame, orient="vertical", command=tree_productos.yview)
-            tree_productos.configure(yscrollcommand=scroll_productos.set)
-            
-            tree_productos.pack(side="left", fill="both", expand=True)
-            scroll_productos.pack(side="right", fill="y")
-            
-            # --- Sección 3: Resumen y total ---
-            resumen_frame = tk.Frame(scrollable_frame, bg="#FDF7EA", bd=2, relief="solid")
-            resumen_frame.pack(fill="x", padx=5, pady=(0, 15))
-            
-            tk.Label(
-                resumen_frame,
-                text="💰 Resumen de la Venta",
-                bg="#FDF7EA",
-                fg="#333333",
-                font=("Segoe UI", 12, "bold")
-            ).pack(anchor="w", padx=15, pady=(10, 5))
-            
-            # Frame para total
-            total_frame = tk.Frame(resumen_frame, bg="#FDF7EA")
-            total_frame.pack(fill="x", padx=15, pady=(0, 10))
-            
-            tk.Label(
-                total_frame,
-                text="TOTAL:",
-                bg="#FDF7EA",
-                fg="#333333",
-                font=("Segoe UI", 14, "bold")
-            ).pack(side="left", padx=(0, 10))
-            
-            lbl_total = tk.Label(
-                total_frame,
-                text="C$ 0.00",
-                bg="#FDF7EA",
-                fg="#157347",
-                font=("Segoe UI", 16, "bold")
-            )
-            lbl_total.pack(side="left")
-            
-            # --- Sección 4: Botones finales ---
-            botones_frame = tk.Frame(scrollable_frame, bg="#F5F1E8")
-            botones_frame.pack(fill="x", padx=5, pady=(0, 10))
-            
-            # -------------------------------------------------
-            # FUNCIONES PARA MANEJAR PRODUCTOS
-            # -------------------------------------------------
-            
-            # Función para agregar producto a la venta
-            # Función para agregar producto a la venta
-            def agregar_producto_venta():
-                if not verificar_stock_antes_agregar():
-                    return
-                
+                productos = productos_disponibles[tipo]
+                nombres = [p[0] for p in productos]
+                cmb_producto['values'] = nombres
+                if nombres:
+                    cmb_producto.set(nombres[0])
+                    actualizar_stock(nombres[0])
+
+            def actualizar_stock(nombre):
                 tipo = cmb_tipo.get()
-                producto = cmb_producto.get()
-                cantidad_str = spin_cantidad.get()
-                cantidad = int(cantidad_str)
-                
-                # Obtener el total actual
-                current_total = total_venta_var.get()
-                
-                # Verificar si ya está en la lista
-                producto_existente = False
-                for i, prod in enumerate(productos_venta):
-                    if prod["nombre"] == producto and prod["tipo"] == tipo:
-                        # Actualizar cantidad existente
-                        productos_venta[i]["cantidad"] += cantidad
-                        productos_venta[i]["subtotal"] = productos_venta[i]["precio_unitario"] * productos_venta[i]["cantidad"]
-                        
-                        # Actualizar treeview
-                        for item in tree_productos.get_children():
-                            if tree_productos.item(item)["values"][0] == producto:
-                                tree_productos.item(item, values=(
-                                    producto,
-                                    productos_venta[i]["cantidad"],
-                                    f"C$ {productos_venta[i]['precio_unitario']:.2f}",
-                                    f"C$ {productos_venta[i]['subtotal']:.2f}"
-                                ))
-                                break
-                        
-                        # Actualizar total
-                        nuevo_total = current_total + (productos_venta[i]["precio_unitario"] * cantidad)
-                        total_venta_var.set(nuevo_total)
-                        lbl_total.config(text=f"C$ {nuevo_total:.2f}")
-                        
-                        # Actualizar stock disponible en memoria
-                        productos_disponibles[tipo][producto]["stock"] -= cantidad
-                        
-                        # Limpiar cantidad y actualizar stock display
-                        spin_cantidad.delete(0, tk.END)
-                        spin_cantidad.insert(0, "1")
-                        actualizar_info_stock(producto)
-                        producto_existente = True
+                productos = productos_disponibles[tipo]
+                for prod in productos:
+                    if prod[0] == nombre:
+                        stock = prod[1]
+                        lbl_stock.config(text=f"Stock: {stock}")
+                        if stock <= 0:
+                            lbl_stock.config(fg="red")
+                        elif stock <= 5:
+                            lbl_stock.config(fg="orange")
+                        else:
+                            lbl_stock.config(fg="green")
                         break
+
+            cmb_tipo.bind("<<ComboboxSelected>>", lambda e: actualizar_lista_productos())
+            cmb_producto.bind("<<ComboboxSelected>>", lambda e: actualizar_stock(cmb_producto.get()))
+            cargar_productos()
+
+            # --- Botón Agregar producto ---
+            btn_agregar_producto = tk.Button(control_frame, text="➕ Agregar a la venta",
+                                            bg="#4CAF50", fg="white", font=("Segoe UI", 9, "bold"),
+                                            relief="flat", padx=15, pady=3)
+            btn_agregar_producto.grid(row=0, column=7, padx=10)
+
+            # --- Treeview de productos agregados ---
+            tree_frame = tk.Frame(productos_frame, bg="#FFFFFF")
+            tree_frame.pack(fill="both", expand=True, padx=15, pady=(0, 10))
+
+            columns = ("Producto", "Cantidad", "Precio Unitario", "Subtotal")
+            tree_productos = ttk.Treeview(tree_frame, columns=columns, show="headings", height=6)
+            
+            for col in columns:
+                tree_productos.heading(col, text=col)
+                tree_productos.column(col, width=120)
+
+            tree_productos.column("Producto", width=200)
+
+            # Scrollbar
+            scrollbar_tree = ttk.Scrollbar(tree_frame, orient="vertical", command=tree_productos.yview)
+            tree_productos.configure(yscrollcommand=scrollbar_tree.set)
+
+            tree_productos.pack(side="left", fill="both", expand=True)
+            scrollbar_tree.pack(side="right", fill="y")
+
+            # --- Botón Eliminar producto ---
+            btn_eliminar_producto = tk.Button(productos_frame, text="🗑️ Eliminar producto seleccionado",
+                                            bg="#F44336", fg="white", font=("Segoe UI", 9, "bold"),
+                                            relief="flat", padx=10, pady=3)
+            btn_eliminar_producto.pack(anchor="e", padx=15, pady=(0, 10))
+
+            # -------------------------------------------------
+            # SECCIÓN 4: RESUMEN DE LA VENTA
+            # -------------------------------------------------
+            resumen_frame = tk.Frame(scrollable_frame, bg="#FFFFFF", bd=1, relief="solid")
+            resumen_frame.pack(fill="x", pady=(0, 15))
+
+            tk.Label(resumen_frame, text="Resumen de la Venta", bg="#FFFFFF",
+                    font=("Segoe UI", 12, "bold"), fg="#34495E").pack(anchor="w", padx=15, pady=10)
+
+            total_frame = tk.Frame(resumen_frame, bg="#FFFFFF")
+            total_frame.pack(fill="x", padx=15, pady=(0, 10))
+
+            tk.Label(total_frame, text="TOTAL:", bg="#FFFFFF",
+                    font=("Segoe UI", 14, "bold")).pack(side="left")
+
+            lbl_total = tk.Label(total_frame, text="C$ 0.00", bg="#FFFFFF",
+                                font=("Segoe UI", 16, "bold"), fg="#27AE60")
+            lbl_total.pack(side="left", padx=10)
+
+            # -------------------------------------------------
+            # BOTONES DE ACCIÓN INFERIORES
+            # -------------------------------------------------
+            botones_frame = tk.Frame(scrollable_frame, bg="#F5F1E8")
+            botones_frame.pack(fill="x", pady=20)
+
+            btn_cancelar = tk.Button(botones_frame, text="❌ Cancelar",
+                                    bg="#E74C3C", fg="white",
+                                    font=("Segoe UI", 11, "bold"),
+                                    relief="flat", padx=30, pady=10)
+            btn_cancelar.pack(side="left", padx=20)
+
+            btn_finalizar = tk.Button(botones_frame, text="✅ Finalizar Venta" if modo == "agregar" else "💾 Guardar Cambios",
+                                    bg="#2ECC71", fg="white",
+                                    font=("Segoe UI", 11, "bold"),
+                                    relief="flat", padx=30, pady=10)
+            btn_finalizar.pack(side="right", padx=20)
+
+            # -------------------------------------------------
+            # FUNCIONALIDAD DE LOS BOTONES
+            # -------------------------------------------------
+            def agregar_producto():
+                tipo = cmb_tipo.get()
+                producto = cmb_producto.get()
+                cantidad = int(spin_cantidad.get())
                 
-                # Si no está en la lista, agregar nuevo
-                if not producto_existente:
-                    info = productos_disponibles[tipo][producto]
-                    subtotal = info["precio"] * cantidad
+                if not producto:
+                    msg.showwarning("Advertencia", "Seleccione un producto")
+                    return
                     
-                    # Agregar a la lista de productos
-                    productos_venta.append({
-                        "tipo": tipo,
-                        "nombre": producto,
-                        "id_produccion": info["id"],
-                        "cantidad": cantidad,
-                        "precio_unitario": info["precio"],
-                        "subtotal": subtotal
-                    })
+                # Buscar precio
+                precio = 0
+                try:
+                    if tipo == "Plato":
+                        cursor.execute("SELECT CostoPorPlato FROM Produccion WHERE NombrePlato = ?", (producto,))
+                    else:
+                        cursor.execute("SELECT CostoPorBebida FROM Produccion WHERE NombreBebida = ?", (producto,))
+                    resultado = cursor.fetchone()
+                    if resultado:
+                        precio = float(resultado[0])
+                except:
+                    pass
                     
-                    # Actualizar treeview
+                subtotal = precio * cantidad
+                
+                # Agregar al treeview
+                tree_productos.insert("", "end", values=(producto, cantidad, f"C$ {precio:.2f}", f"C$ {subtotal:.2f}"))
+                
+                # Actualizar total
+                actualizar_total()
+                
+                # Resetear controles
+                spin_cantidad.delete(0, tk.END)
+                spin_cantidad.insert(0, "1")
+                actualizar_lista_productos()
+
+            def eliminar_producto_seleccionado():
+                seleccion = tree_productos.selection()
+                if seleccion:
+                    tree_productos.delete(seleccion)
+                    actualizar_total()
+
+            def actualizar_total():
+                total = 0
+                for item in tree_productos.get_children():
+                    valores = tree_productos.item(item, "values")
+                    if len(valores) >= 4:
+                        subtotal_str = valores[3].replace("C$ ", "").strip()
+                        try:
+                            subtotal = float(subtotal_str)
+                            total += subtotal
+                        except:
+                            pass
+                lbl_total.config(text=f"C$ {total:.2f}")
+                total_venta_var.set(total)
+
+            def guardar_venta():
+                # ---------------------------
+                # VALIDACIONES
+                # ---------------------------
+                mesa = entry_mesa.get().strip()
+                if not mesa.isdigit():
+                    msg.showerror("Error", "Ingrese un número de mesa válido")
+                    return
+
+                if len(tree_productos.get_children()) == 0:
+                    msg.showerror("Error", "Debe agregar al menos un producto")
+                    return
+
+                # ---------------------------
+                # OBTENER ID DEL CLIENTE
+                # ---------------------------
+                id_cliente = None
+                tipo = cliente_opcion.get()
+
+                if tipo == "registrar":
+                    nombre = entry_nombre.get().strip()
+                    apellido = entry_apellido.get().strip()
+                    telefono = entry_telefono.get().strip()
+
+                    if not nombre or not apellido:
+                        msg.showerror("Error", "Ingrese nombre y apellido del cliente")
+                        return
+
+                    # Insertar teléfono
+                    cursor.execute("INSERT INTO TelefonoCliente (Telefono) OUTPUT INSERTED.IDTelefonoClientes VALUES (?)",
+                                   (telefono,))
+                    id_tel = cursor.fetchone()[0]
+
+                    # Insertar cliente
+                    cursor.execute("""
+                        INSERT INTO Clientes (NumeroDeMesa, IDTelefonoClientes, Nombre1, Apellido1)
+                        OUTPUT INSERTED.IDClientes
+                        VALUES (?, ?, ?, ?)
+                    """, (mesa, id_tel, nombre, apellido))
+                    id_cliente = cursor.fetchone()[0]
+
+                elif tipo == "seleccionar":
+                    cliente_sel = cmb_cliente.get()
+                    if cliente_sel:
+                        nombre, apellido = cliente_sel.split(" ", 1)
+                        cursor.execute("""
+                            SELECT IDClientes 
+                            FROM Clientes 
+                            WHERE Nombre1=? AND Apellido1=?
+                        """, (nombre, apellido))
+                        fila = cursor.fetchone()
+                        if fila:
+                            id_cliente = fila[0]
+
+                # ---------------------------
+                # MODO AGREGAR NUEVA VENTA
+                # ---------------------------
+                if modo == "agregar":
+                    from datetime import datetime
+                    f = datetime.now()
+
+                    # Insertar venta
+                    cursor.execute("""
+                        INSERT INTO Venta (Dia, Mes, Ano, MontoTotal, Hora)
+                        OUTPUT INSERTED.IDVentas
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (f.day, f.month, f.year, total_venta_var.get(), f.strftime("%H:%M:%S")))
+
+                    nueva_id = cursor.fetchone()[0]
+
+                    # Insertar productos
+                    for item in tree_productos.get_children():
+                        nombre_prod, cantidad, precio_str, subtotal_str = tree_productos.item(item)["values"]
+                        precio = float(precio_str.replace("C$ ", ""))
+
+                        # Obtener IDMenuPlatos o IDMenuBebidas
+                        cursor.execute("SELECT IDMenuPlatos FROM MenuDePlatos WHERE NombrePlato=?", (nombre_prod,))
+                        pl = cursor.fetchone()
+
+                        if pl:
+                            cursor.execute("""
+                                INSERT INTO VentasClientesMenuBebidasMenuPlatos
+                                (IDVentas, IDMenuPlatos, Cantidad, NombrePlato, Precio, IDClientes)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (nueva_id, pl[0], cantidad, nombre_prod, precio, id_cliente))
+                        else:
+                            cursor.execute("SELECT IDMenuBebidas FROM MenuDeBebidas WHERE NombreBebida=?", (nombre_prod,))
+                            beb = cursor.fetchone()
+                            cursor.execute("""
+                                INSERT INTO VentasClientesMenuBebidasMenuPlatos
+                                (IDVentas, IDMenuBebidas, Cantidad, NombreBebida, Precio, IDClientes)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (nueva_id, beb[0], cantidad, nombre_prod, precio, id_cliente))
+
+                    conexion.commit()
+                    msg.showinfo("Éxito", f"Venta #{nueva_id} registrada correctamente")
+                    cargar_ventas()
+                    ventana.destroy()
+                    return
+
+                # ---------------------------
+                # MODO EDITAR VENTA
+                # ---------------------------
+                if modo == "editar":
+                    # Actualizar total
+                    cursor.execute("""
+                        UPDATE Venta 
+                        SET MontoTotal=? 
+                        WHERE IDVentas=?
+                    """, (total_venta_var.get(), id_venta))
+
+                    # Borrar productos anteriores
+                    cursor.execute("DELETE FROM VentasClientesMenuBebidasMenuPlatos WHERE IDVentas=?", (id_venta,))
+
+                    # Reinsertar productos
+                    for item in tree_productos.get_children():
+                        nombre_prod, cantidad, precio_str, subtotal_str = tree_productos.item(item)["values"]
+                        precio = float(precio_str.replace("C$ ", ""))
+
+                        cursor.execute("SELECT IDMenuPlatos FROM MenuDePlatos WHERE NombrePlato=?", (nombre_prod,))
+                        pl = cursor.fetchone()
+
+                        if pl:
+                            cursor.execute("""
+                                INSERT INTO VentasClientesMenuBebidasMenuPlatos
+                                (IDVentas, IDMenuPlatos, Cantidad, NombrePlato, Precio, IDClientes)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (id_venta, pl[0], cantidad, nombre_prod, precio, id_cliente))
+                        else:
+                            cursor.execute("SELECT IDMenuBebidas FROM MenuDeBebidas WHERE NombreBebida=?", (nombre_prod,))
+                            beb = cursor.fetchone()
+                            cursor.execute("""
+                                INSERT INTO VentasClientesMenuBebidasMenuPlatos
+                                (IDVentas, IDMenuBebidas, Cantidad, NombreBebida, Precio, IDClientes)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            """, (id_venta, beb[0], cantidad, nombre_prod, precio, id_cliente))
+
+                    conexion.commit()
+                    msg.showinfo("Éxito", f"Venta #{id_venta} actualizada correctamente")
+                    cargar_ventas()
+                    ventana.destroy()
+
+                    
+                
+
+            # Asignar funciones a botones
+            btn_agregar_producto.config(command=agregar_producto)
+            btn_eliminar_producto.config(command=eliminar_producto_seleccionado)
+            btn_cancelar.config(command=ventana.destroy)
+            btn_finalizar.config(command=guardar_venta)
+
+            # Si es edición, cargar datos existentes
+            if modo == "editar" and productos_existentes:
+                for prod in productos_existentes:
+                    nombre = prod[0] if prod[0] else prod[1]
+                    cantidad = prod[2]
+                    precio = prod[3]
+                    subtotal = float(precio) * int(cantidad)
                     tree_productos.insert("", "end", values=(
-                        producto,
-                        cantidad,
-                        f"C$ {info['precio']:.2f}",
+                        nombre, 
+                        cantidad, 
+                        f"C$ {float(precio):.2f}", 
                         f"C$ {subtotal:.2f}"
                     ))
-                    
-                    # Actualizar total
-                    nuevo_total = current_total + subtotal
-                    total_venta_var.set(nuevo_total)
-                    lbl_total.config(text=f"C$ {nuevo_total:.2f}")
-                    
-                    # Actualizar stock disponible en memoria
-                    productos_disponibles[tipo][producto]["stock"] -= cantidad
-                    
-                    # Limpiar cantidad y actualizar stock display
-                    spin_cantidad.delete(0, tk.END)
-                    spin_cantidad.insert(0, "1")
-                    actualizar_info_stock(producto)
-            # Función para eliminar producto seleccionado
-            # Función para eliminar producto seleccionado
-            def eliminar_producto_seleccionado():
-                seleccionado = tree_productos.selection()
-                if not seleccionado:
-                    msg.showwarning("Atención", "Seleccione un producto para eliminar.")
-                    return
-                
-                # Obtener información del producto
-                item = tree_productos.item(seleccionado[0])
-                valores = item["values"]
-                nombre_producto = valores[0]
-                cantidad = int(valores[1])
-                
-                # Obtener el total actual
-                current_total = total_venta_var.get()
-                
-                # Buscar en qué tipo está el producto
-                producto_encontrado = False
-                for tipo in ["Plato", "Bebida"]:
-                    if nombre_producto in productos_disponibles[tipo]:
-                        # Devolver stock
-                        productos_disponibles[tipo][nombre_producto]["stock"] += cantidad
-                        
-                        # Restar del total
-                        subtotal = float(valores[3].replace("C$", "").strip())
-                        nuevo_total = current_total - subtotal
-                        total_venta_var.set(nuevo_total)
-                        lbl_total.config(text=f"C$ {nuevo_total:.2f}")
-                        
-                        # Eliminar de la lista de productos
-                        for i, prod in enumerate(productos_venta):
-                            if prod["nombre"] == nombre_producto:
-                                productos_venta.pop(i)
-                                break
-                        
-                        # Actualizar display de stock si este producto está seleccionado
-                        if cmb_producto.get() == nombre_producto:
-                            actualizar_info_stock(nombre_producto)
-                        
-                        producto_encontrado = True
-                        break
-                
-                if not producto_encontrado:
-                    msg.showwarning("Advertencia", "Producto no encontrado en la lista disponible.")
-                
-                # Eliminar del treeview
-                tree_productos.delete(seleccionado[0])
-            
-            # Función para finalizar venta
-            def finalizar_venta():
-                # Obtener el total de la variable
-                total_venta = total_venta_var.get()
-                
-                # Validaciones
-                mesa = entry_mesa.get().strip()
-                if not mesa or not mesa.isdigit():
-                    msg.showwarning("Atención", "Ingrese un número de mesa válido.")
-                    return
-                
-                if not productos_venta:
-                    msg.showwarning("Atención", "Agregue al menos un producto a la venta.")
-                    return
-    
-                
-                try:
-                    # Procesar cliente según opción seleccionada
-                    id_cliente = None
-                    
-                    if opcion_cliente.get() == "registrar":
-                        nombre = entry_nombre_cliente.get().strip()
-                        apellido = entry_apellido_cliente.get().strip()
-                        telefono = entry_telefono_cliente.get().strip()
-                        mesa_cliente = entry_mesa_cliente.get().strip()
-                        
-                        if not nombre or not apellido:
-                            msg.showwarning("Atención", "Ingrese nombre y apellido del cliente.")
-                            return
-                        
-                        # Insertar teléfono si se proporcionó
-                        if telefono:
-                            cursor.execute(
-                                "INSERT INTO TelefonoCliente (Telefono) VALUES (?)",
-                                (telefono,)
-                            )
-                            cursor.execute("SELECT MAX(IDTelefonoClientes) FROM TelefonoCliente")
-                            id_telefono = cursor.fetchone()[0]
-                        else:
-                            cursor.execute("INSERT INTO TelefonoCliente (Telefono) VALUES ('')")
-                            cursor.execute("SELECT MAX(IDTelefonoClientes) FROM TelefonoCliente")
-                            id_telefono = cursor.fetchone()[0]
-                        
-                        # Insertar cliente
-                        cursor.execute(
-                            """INSERT INTO Clientes 
-                            (NumeroDeMesa, IDTelefonoClientes, Nombre1, Apellido1) 
-                            VALUES (?, ?, ?, ?)""",
-                            (int(mesa_cliente) if mesa_cliente.isdigit() else int(mesa), 
-                            id_telefono, nombre, apellido)
-                        )
-                        cursor.execute("SELECT MAX(IDClientes) FROM Clientes")
-                        id_cliente = cursor.fetchone()[0]
-                        
-                    elif opcion_cliente.get() == "seleccionar":
-                        cliente_seleccionado = cmb_cliente_existente.get()
-                        if cliente_seleccionado and cliente_seleccionado != "No hay clientes registrados":
-                            # Buscar el ID del cliente por nombre
-                            for id_cli, info in clientes_registrados.items():
-                                if info["nombre"] == cliente_seleccionado:
-                                    id_cliente = id_cli
-                                    break
-                    
-                    # Insertar venta principal
-                    fecha_actual = datetime.now()
-                    cursor.execute(
-                        """INSERT INTO Venta 
-                        (Dia, Mes, Ano, MontoTotal, Hora) 
-                        VALUES (?, ?, ?, ?, ?)""",
-                        (fecha_actual.day, fecha_actual.month, fecha_actual.year, total_venta, 
-                        fecha_actual.strftime('%H:%M:%S'))
-                    )
-                    cursor.execute("SELECT MAX(IDVentas) FROM Venta")
-                    id_venta = cursor.fetchone()[0]
-                    
-                    # Insertar productos de la venta
-                    for prod in productos_venta:
-                        if prod["tipo"] == "Plato":
-                            cursor.execute(
-                                """INSERT INTO VentasClientesMenuBebidasMenuPlatos 
-                                (IDVentas, Cantidad, NombrePlato, Precio) 
-                                VALUES (?, ?, ?, ?)""",
-                                (id_venta, prod["cantidad"], prod["nombre"], prod["precio_unitario"])
-                            )
-                            
-                            # Actualizar stock en producción
-                            cursor.execute(
-                                """UPDATE Produccion 
-                                SET CantidadDePlatos = CantidadDePlatos - ? 
-                                WHERE IDProduccion = ?""",
-                                (prod["cantidad"], prod["id_produccion"])
-                            )
-                        else:  # Bebida
-                            cursor.execute(
-                                """INSERT INTO VentasClientesMenuBebidasMenuPlatos 
-                                (IDVentas, Cantidad, NombreBebida, Precio) 
-                                VALUES (?, ?, ?, ?)""",
-                                (id_venta, prod["cantidad"], prod["nombre"], prod["precio_unitario"])
-                            )
-                            
-                            # Actualizar stock en producción
-                            cursor.execute(
-                                """UPDATE Produccion 
-                                SET CantidadDeBebidas = CantidadDeBebidas - ? 
-                                WHERE IDProduccion = ?""",
-                                (prod["cantidad"], prod["id_produccion"])
-                            )
-                    
-                    # Si hay cliente, asociarlo
-                    if id_cliente:
-                        cursor.execute(
-                            """UPDATE VentasClientesMenuBebidasMenuPlatos 
-                            SET IDClientes = ? 
-                            WHERE IDVentas = ? AND IDClientes IS NULL""",
-                            (id_cliente, id_venta)
-                        )
-                    
-                    conexion.commit()
-                    
-                    msg.showinfo("Éxito", f"Venta #{id_venta} registrada correctamente.\nTotal: C$ {total_venta:.2f}")
-                    
-                    # Actualizar vistas
-                    cargar_ventas()
-                    if hasattr(self, 'cargar_produccion'):
-                        self.cargar_produccion()
-                    
-                    ventana.destroy()
-                    
-                except Exception as e:
-                    conexion.rollback()
-                    msg.showerror("Error", f"No se pudo registrar la venta:\n{str(e)}")
-                                    
-            # Función para cancelar
-            def cancelar_venta():
-                if productos_venta:
-                    respuesta = msg.askyesno("Cancelar", 
-                                        "¿Está seguro de cancelar la venta?\nSe perderán todos los productos agregados.")
-                    if respuesta:
-                        ventana.destroy()
-                else:
-                    ventana.destroy()
+                actualizar_total()
 
-        
-            
-            # -------------------------------------------------
-            # AHORA SÍ CREAR LOS BOTONES QUE USAN LAS FUNCIONES
-            # -------------------------------------------------
-            
-            # Botón para agregar producto
-            btn_agregar_producto = tk.Button(
-                control_frame,
-                text="➕ Agregar a la venta",
-                bg="#CFE5C8",
-                fg="#333333",
-                font=("Segoe UI", 9, "bold"),
-                relief="flat",
-                padx=10,
-                pady=4,
-                command=agregar_producto_venta  # SIN lambda, ya que la función ya está definida
-            )
-            btn_agregar_producto.grid(row=0, column=7, sticky="w", padx=10)
-            
-            # Botón para eliminar producto seleccionado
-            btn_eliminar_producto = tk.Button(
-                productos_frame,
-                text="🗑️ Eliminar producto seleccionado",
-                bg="#F2B6B6",
-                fg="#333333",
-                font=("Segoe UI", 9, "bold"),
-                relief="flat",
-                padx=10,
-                pady=4,
-                command=eliminar_producto_seleccionado  # SIN lambda, ya que la función ya está definida
-            )
-            btn_eliminar_producto.pack(anchor="e", padx=15, pady=(0, 10))
-            
-            # Botones finales
-            btn_cancelar = tk.Button(
-                botones_frame,
-                text="❌ Cancelar",
-                bg="#F2B6B6",
-                fg="#333333",
-                font=("Segoe UI", 11, "bold"),
-                relief="flat",
-                padx=20,
-                pady=8,
-                command=cancelar_venta
-            )
-            btn_cancelar.pack(side="left", padx=5)
-            
-            btn_finalizar = tk.Button(
-                botones_frame,
-                text="✅ Finalizar Venta",
-                bg="#CFE5C8",
-                fg="#333333",
-                font=("Segoe UI", 11, "bold"),
-                relief="flat",
-                padx=20,
-                pady=8,
-                command=finalizar_venta
-            )
-            btn_finalizar.pack(side="right", padx=5)
-            
+        # -------------------------------------------------
+        # VENTANA DE DETALLE DE VENTA (SOLO LECTURA)
+        # -------------------------------------------------
+        def abrir_detalle_venta(id_venta):
+            ventana = tk.Toplevel(self)
+            ventana.title(f"Detalle de Venta #{id_venta}")
+            ventana.configure(bg="#F5F1E8")
+            ventana.geometry("700x600")
             ventana.transient(self)
             ventana.grab_set()
 
-        #----------------------------------------------------------------------------------------------------------------------------------------------------
+            # Cargar datos
+            try:
+                cursor.execute("""
+                    SELECT 
+                        CONCAT(V.Dia,'/',V.Mes,'/',V.Ano) AS Fecha,
+                        V.Hora,
+                        ISNULL(C.NumeroDeMesa, 0),
+                        ISNULL(CONCAT(C.Nombre1,' ',C.Apellido1), 'Cliente ocasional'),
+                        V.MontoTotal
+                    FROM Venta V
+                    LEFT JOIN VentasClientesMenuBebidasMenuPlatos VC ON VC.IDVentas = V.IDVentas
+                    LEFT JOIN Clientes C ON C.IDClientes = VC.IDClientes
+                    WHERE V.IDVentas = ?
+                """, (id_venta,))
+                info = cursor.fetchone()
+            except:
+                msg.showerror("Error", "No se pudo cargar el detalle")
+                ventana.destroy()
+                return
+
+            # Frame de información
+            info_frame = tk.Frame(ventana, bg="#FFFFFF", bd=1, relief="solid")
+            info_frame.pack(fill="x", padx=10, pady=10)
+
+            tk.Label(info_frame, text="📄 Información General", bg="#FFFFFF",
+                    font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=15, pady=10)
+
+            detalles = [
+                f"Fecha: {info[0]}",
+                f"Hora: {info[1]}",
+                f"Mesa: {info[2]}",
+                f"Cliente: {info[3]}"
+            ]
+
+            for detalle in detalles:
+                tk.Label(info_frame, text=detalle, bg="#FFFFFF", 
+                        font=("Segoe UI", 10)).pack(anchor="w", padx=20, pady=2)
+
+            # Productos
+            prod_frame = tk.Frame(ventana, bg="#FFFFFF", bd=1, relief="solid")
+            prod_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+            tk.Label(prod_frame, text="🛒 Productos vendidos", bg="#FFFFFF",
+                    font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=15, pady=10)
+
+            # Treeview
+            tree_det = ttk.Treeview(prod_frame, columns=("Producto", "Cantidad", "Precio", "Subtotal"), 
+                                show="headings", height=10)
+            
+            for col in ("Producto", "Cantidad", "Precio", "Subtotal"):
+                tree_det.heading(col, text=col)
+                tree_det.column(col, width=100)
+            
+            tree_det.column("Producto", width=200)
+
+            scrollbar = ttk.Scrollbar(prod_frame, orient="vertical", command=tree_det.yview)
+            tree_det.configure(yscrollcommand=scrollbar.set)
+
+            tree_det.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+
+            # Cargar productos
+            cursor.execute("""
+                SELECT NombrePlato, NombreBebida, Cantidad, Precio
+                FROM VentasClientesMenuBebidasMenuPlatos
+                WHERE IDVentas = ?
+            """, (id_venta,))
+            
+            productos = cursor.fetchall()
+            for prod in productos:
+                nombre = prod[0] if prod[0] else prod[1]
+                cantidad = prod[2]
+                precio = prod[3]
+                subtotal = float(precio) * int(cantidad)
+                tree_det.insert("", "end", values=(
+                    nombre, cantidad, f"C$ {float(precio):.2f}", f"C$ {subtotal:.2f}"
+                ))
+
+            # Total
+            total_frame = tk.Frame(ventana, bg="#FFFFFF", bd=1, relief="solid")
+            total_frame.pack(fill="x", padx=10, pady=10)
+
+            tk.Label(total_frame, text="TOTAL:", bg="#FFFFFF",
+                    font=("Segoe UI", 14, "bold")).pack(side="left", padx=20, pady=10)
+            
+            tk.Label(total_frame, text=f"C$ {float(info[4]):.2f}", bg="#FFFFFF",
+                    font=("Segoe UI", 16, "bold"), fg="#27AE60").pack(side="left", pady=10)
+
+            # Botón cerrar
+            tk.Button(ventana, text="Cerrar", bg="#95A5A6", fg="white",
+                    font=("Segoe UI", 11, "bold"), relief="flat",
+                    padx=30, pady=8, command=ventana.destroy).pack(pady=20)
 
         # -------------------------------------------------
-        # ASIGNAR BOTONES
+        # DOBLE CLIC: mostrar detalle
         # -------------------------------------------------
-        btn_agregar.config(command=agregar_venta)
-        btn_eliminar.config(command=eliminar_venta)
-      #  btn_limpiar.config(command=limpiar_campos)
-        btn_editar.config(text="Editar venta", command=editar_venta)
-        
-        # Configurar doble clic para ver detalle
-        tree.bind("<Double-1>", mostrar_detalle_venta)
+        def mostrar_detalle(event):
+            sel = tree.selection()
+            if sel:
+                id_venta = int(tree.item(sel[0])["values"][0])
+                abrir_detalle_venta(id_venta)
 
-        # ---------- Cargar datos al inicio ----------
-        cargar_ventas()
+        tree.bind("<Double-1>", mostrar_detalle)
+
+        # Configurar botones principales
+        btn_agregar.config(command=agregar_venta, text="➕ Nueva Venta")
+        btn_editar.config(command=editar_venta, text="✏️ Editar")
+        btn_eliminar.config(command=eliminar_venta, text="🗑️ Eliminar")
+
         return frame
-        
-        
+
 # ----------------------- MAIN ---------------------------------------------------
 if __name__ == "__main__":
     app = RestauranteUI()
