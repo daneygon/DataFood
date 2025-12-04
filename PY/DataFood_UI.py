@@ -28,10 +28,108 @@ def conectar():
 class RestauranteUI(tk.Tk):
     LEFT_PANEL_WIDTH = 260
 
+    def apply_theme(self, mode):
+        """Aplica estilo claro u oscuro a TODA la interfaz"""
+        
+        # ---------------------- MODO CLARO ----------------------
+        if mode == "light":
+            self.colors = {
+                "bg_main": "#F5F1E8",
+                "bg_sidebar": "#C8B88A",
+                "bg_header": "#C8B88A",
+                "text": "#000000",
+                "panel": "#FFFFFF",
+                "button": "#E6E2D3",
+                "button_text": "#000000",
+            }
+
+        # ---------------------- MODO OSCURO REAL ----------------------
+        elif mode == "dark":
+            self.colors = {
+                "bg_main": "#1E1E1E",
+                "bg_sidebar": "#252526",
+                "bg_header": "#2D2D2D",
+                "panel": "#2A2A2A",
+                "text": "#F1F1F1",
+                "button": "#3C3C3C",
+                "button_text": "#FFFFFF",
+            }
+
+        self.current_theme = mode
+
+        # -----------------------------------------
+        # Aplicar colores globales
+        # -----------------------------------------
+        try:
+            self.configure(bg=self.colors["bg_main"])
+            self.center_frame.configure(bg=self.colors["panel"])
+            self.sidebar.configure(bg=self.colors["bg_sidebar"])
+            self.right_panel.configure(bg=self.colors["panel"])
+        except:
+            pass
+
+        # Header
+        self.header_title.configure(bg=self.colors["bg_header"], fg=self.colors["text"])
+        self.time_label.configure(bg=self.colors["bg_header"], fg=self.colors["text"])
+
+        # Botones del sidebar
+        for widget in self.sidebar.winfo_children():
+            try:
+                widget.configure(bg=self.colors["bg_sidebar"], fg=self.colors["text"])
+            except:
+                pass
+
+    def set_theme(self, mode):
+        """Permite cambiar entre claro y oscuro"""
+        self.apply_theme(mode)
+        self._mostrar_dashboard_inicial()
+
+
+    THEMES = {
+    "default": {
+        "bg_main": "#F5F1E8",
+        "bg_cards": "#FFFFFF",
+        "bg_sidebar": "#C8B88A",
+        "text_primary": "#333333",
+        "text_secondary": "#555555",
+        "accent": "#157347"
+    },
+    "dark": {
+        "bg_main": "#1E1E1E",
+        "bg_cards": "#2A2A2A",
+        "bg_sidebar": "#111111",
+        "text_primary": "#F0F0F0",
+        "text_secondary": "#CCCCCC",
+        "accent": "#3FA9F5"
+    }
+}
+
     # 1. MODIFICAR EL __init__ PARA MANTENER EL PANEL DERECHO
    # 1. MODIFICAR EL __init__ - PANEL DERECHO MÁS ANCHO
     def __init__(self):
         super().__init__()
+
+        # ===========================
+        # 1. DEFINIR TEMAS ANTES DE TODO
+        # ===========================
+        self.temas = {
+            "default": {
+                "bg": "#F5F1E8",
+                "bg_header": "#C8B88A",
+                "text": "#333333",
+                "sidebar": "#C8B88A"
+            },
+            "oscuro": {
+                "bg": "#1E1E1E",
+                "bg_header": "#2D2D2D",
+                "text": "#FFFFFF",
+                "sidebar": "#2D2D2D"
+            }
+        }
+
+        # Guardar tema actual
+        self.tema_actual = "default"
+        self.colors = self.temas[self.tema_actual]
 
         # ---------- Ventana principal ---------------
         self.title("Sistema de Gestión de Restaurante - DataFood")
@@ -48,12 +146,13 @@ class RestauranteUI(tk.Tk):
 
         self.header_title = tk.Label(
             header,
-            text="  DataFood  | sistema para la gestión de insumos y ventas de un comedor(COMEDOR RAQUEL)",
+            text="  DataFood  | sistema para la gestión de insumos y ventas de un comedor (COMEDOR RAQUEL)",
             bg="#C8B88A",
             fg="#ffffff",
             font=("Segoe UI", 15, "bold")
         )
         self.header_title.pack(side="left", pady=5, padx=10)
+
 
         self.time_label = tk.Label(
             header,
@@ -65,6 +164,7 @@ class RestauranteUI(tk.Tk):
         self.time_label.pack(side="right", pady=5, padx=15)
 
         self._actualizar_hora()
+        
 
         # --------------- CONTENEDOR PRINCIPAL (3 COLUMNAS) ------------------
         main_content = tk.Frame(self, bg="#F5F1E8")
@@ -113,12 +213,31 @@ class RestauranteUI(tk.Tk):
         )
         gestion_btn.pack(fill="x", padx=15, pady=(10, 5))
 
-        ttk.Button(self.sidebar, text="Reportes").pack(
-            fill="x", padx=15, pady=5
+        btn_reportes = tk.Button(
+            self.sidebar,
+            text="Reportes",
+            bg="#FFFFFF",
+            fg="#333333",
+            relief="solid",
+            borderwidth=1,
+            highlightthickness=0,
+            font=("Segoe UI", 11, "bold"),
+            activebackground="#0F0505",
+            activeforeground="#FDF7F7",
+            command=self._abrir_ventana_reportes
+
+
         )
-        ttk.Button(self.sidebar, text="Ajustes").pack(
-            fill="x", padx=15, pady=5
+        btn_reportes.pack(fill="x", padx=15, pady=8)
+
+
+        btn_ajustes = ttk.Button(
+            self.sidebar,
+            text="Ajustes",
+            command=self._abrir_ventana_ajustes   # igual que gestión/reportes
         )
+        btn_ajustes.pack(fill="x", padx=15, pady=5)
+
 
         # ------------------ ZONA CENTRAL DINÁMICA ----------------
         self.center_frame = tk.Frame(main_content, bg="#FFFFFF")
@@ -138,6 +257,7 @@ class RestauranteUI(tk.Tk):
             justify="center"
         ).pack(padx=10, pady=20)
 
+      
         tk.Label(
             self.right_panel,
             text="no se que poner pero algo voy a poner\n"
@@ -149,6 +269,8 @@ class RestauranteUI(tk.Tk):
             font=("Segoe UI", 9),
             justify="left"
         ).pack(padx=15, pady=5)
+
+    
 
         # estado de paneles
         self.sidebar_visible = True
@@ -167,6 +289,299 @@ class RestauranteUI(tk.Tk):
 
         # al iniciar, mostramos el "Menú de Platos y Bebidas"
         self._mostrar_dashboard_inicial()
+
+
+        self.current_theme = "light"
+        self.colors = {}
+        self.apply_theme("light")
+
+
+        # ====================================================
+    # SISTEMA DE TEMAS (CLARO / OSCURO)
+    # ====================================================
+    
+
+
+
+
+
+#-----------------------REPORTES
+    def _abrir_ventana_reportes(self):
+
+        # Ocultar panel derecho
+        if getattr(self, "right_panel_visible", False):
+            self.right_panel.pack_forget()
+            self.right_panel_visible = False
+
+        # Limpiar contenido
+        for widget in self.center_frame.winfo_children():
+            widget.destroy()
+
+        # --------- CONTENEDOR ----------
+        container = tk.Frame(self.center_frame, bg="#FFFFFF")
+        container.pack(fill="both", expand=True)
+
+        # --------- BARRA SUPERIOR ----------
+        top_bar = tk.Frame(container, bg="#FFFFFF")
+        top_bar.pack(fill="x", pady=(10, 5))
+
+        # Flecha retractil (misma del panel Gestion)
+        self.arrow_btn = tk.Button(
+            top_bar,
+            text="◀",
+            bg="#FFFFFF",
+            bd=0,
+            font=("Segoe UI", 12, "bold"),
+            command=self._toggle_sidebar
+        )
+        self.arrow_btn.pack(side="left", padx=(5, 5))
+
+        tk.Label(
+            top_bar,
+            text="📊 Panel de Reportes",
+            bg="#FFFFFF",
+            fg="#333333",
+            font=("Segoe UI", 14, "bold")
+        ).pack(side="left", padx=5)
+
+        # --------- PANEL PRINCIPAL DE REPORTES ----------
+        report_frame = tk.Frame(container, bg="#FFFFFF")
+        report_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        # 🔥 Cargar reportes
+        self._cargar_reportes_panel(report_frame)
+
+        # =====================
+        # TEMAS DE COLOR
+        # =====================
+        tk.Label(
+            ajustes_frame,
+            text="Cambiar Tema",
+            bg="#FFFFFF",
+            fg="#333333",
+            font=("Segoe UI", 13, "bold")
+        ).pack(anchor="w", pady=(20,5))
+
+        btn_default = tk.Button(
+            ajustes_frame,
+            text="Modo Claro (Default)",
+            bg="#C8B88A",
+            fg="white",
+            relief="flat",
+            font=("Segoe UI", 11, "bold"),
+            command=lambda: self.aplicar_tema("default")
+        )
+        btn_default.pack(anchor="w", pady=5)
+
+        btn_dark = tk.Button(
+            ajustes_frame,
+            text="Modo Oscuro",
+            bg="#333333",
+            fg="white",
+            relief="flat",
+            font=("Segoe UI", 11, "bold"),
+            command=lambda: self.aplicar_tema("dark")
+        )
+        btn_dark.pack(anchor="w", pady=5)
+
+
+#-------------------------REPORTES
+    def _cargar_reportes_panel(self, parent):
+        """Carga métricas y gráficos reales de SQL Server."""
+
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+        conexion = conectar()
+        cursor = conexion.cursor()
+
+        # ------------------------------
+        # 1. GASTO REAL EN INSUMOS
+        # ------------------------------
+        cursor.execute("""
+            SELECT SUM(PrecioCompra * CantidadComprada)
+            FROM ProveedoresInsumos
+        """)
+        gasto_total = cursor.fetchone()[0] or 0
+
+        # ------------------------------
+        # 2. GANANCIAS REALES
+        # ------------------------------
+        cursor.execute("SELECT SUM(Ganancias) FROM Venta")
+        ganancias = cursor.fetchone()[0] or 0
+
+        # ------------------------------
+        # 3. BALANCE
+        # ------------------------------
+        balance = ganancias - gasto_total
+
+        # ------------------------------
+        # 4. VENTAS POR MES (REALS)
+        # ------------------------------
+        cursor.execute("""
+            SELECT Mes, SUM(MontoTotal)
+            FROM Venta
+            GROUP BY Mes
+            ORDER BY Mes
+        """)
+        ventas_mes = cursor.fetchall()
+
+        meses = [row[0] for row in ventas_mes]
+        totales_mes = [row[1] for row in ventas_mes]
+
+        # ------------------------------
+        # 5. TOP 5 PRODUCTOS MÁS VENDIDOS (REALS)
+        # ------------------------------
+        cursor.execute("""
+            SELECT TOP 5 
+                ISNULL(NombrePlato, NombreBebida) AS Producto,
+                SUM(Cantidad) AS Total
+            FROM VentasClientesMenuBebidasMenuPlatos
+            GROUP BY NombrePlato, NombreBebida
+            ORDER BY Total DESC
+        """)
+        top5 = cursor.fetchall()
+
+        productos = [row[0] for row in top5]
+        cantidades = [row[1] for row in top5]
+
+        conexion.close()
+
+        # ------------------------------
+        # TARJETAS DE MÉTRICAS
+        # ------------------------------
+        card_container = tk.Frame(parent, bg="#FFFFFF")
+        card_container.pack(fill="x", pady=20)
+
+        def crear_card(titulo, valor, color):
+            card = tk.Frame(card_container, bg=color, width=260, height=110)
+            card.pack(side="left", padx=15)
+            card.pack_propagate(False)
+
+            tk.Label(
+                card, text=titulo, bg=color, fg="#FFFFFF",
+                font=("Segoe UI", 12, "bold")
+            ).pack(pady=(10, 5))
+
+            tk.Label(
+                card, text=f"C$ {valor:.2f}", bg=color, fg="#FFFFFF",
+                font=("Segoe UI", 16, "bold")
+            ).pack()
+
+        crear_card("📕 Gastos en Insumos", gasto_total, "#A93226")
+        crear_card("🟢 Ganancias Totales", ganancias, "#1E8449")
+        crear_card("📘 Balance Final", balance, "#1F3A60")
+
+        # ------------------------------
+        # GRAFICO 1 — VENTAS POR MES
+        # ------------------------------
+        fig1 = plt.Figure(figsize=(5.5, 3), dpi=100)
+        ax1 = fig1.add_subplot(111)
+        ax1.bar(meses, totales_mes, color="#2980B9")
+        ax1.set_title("Ventas por Mes")
+        ax1.set_xlabel("Mes")
+        ax1.set_ylabel("C$")
+
+        canvas1 = FigureCanvasTkAgg(fig1, parent)
+        canvas1.get_tk_widget().pack(side="left", padx=20, pady=10)
+
+        # ------------------------------
+        # GRAFICO 2 — TOP 5 MÁS VENDIDOS
+        # ------------------------------
+        fig2 = plt.Figure(figsize=(5.5, 3), dpi=100)
+        ax2 = fig2.add_subplot(111)
+        ax2.barh(productos, cantidades, color="#27AE60")
+        ax2.set_title("Top 5 productos más vendidos")
+
+        canvas2 = FigureCanvasTkAgg(fig2, parent)
+        canvas2.get_tk_widget().pack(side="left", padx=20, pady=10)
+
+    def _abrir_ventana_ajustes(self):
+        """Carga la ventana de Ajustes dentro del center_frame igual que Gestión."""
+
+        # Ocultar panel derecho
+        if getattr(self, "right_panel_visible", False):
+            self.right_panel.pack_forget()
+            self.right_panel_visible = False
+
+        # Limpiar contenido
+        for widget in self.center_frame.winfo_children():
+            widget.destroy()
+
+        # Contenedor principal
+        container = tk.Frame(self.center_frame, bg="#FFFFFF")
+        container.pack(fill="both", expand=True)
+
+        # Barra superior con flecha retractil
+        top_bar = tk.Frame(container, bg="#FFFFFF")
+        top_bar.pack(fill="x", pady=(10, 5))
+
+        self.arrow_btn = tk.Button(
+            top_bar,
+            text="◀",
+            bg="#FFFFFF",
+            bd=0,
+            font=("Segoe UI", 12, "bold"),
+            command=self._toggle_sidebar
+        )
+        self.arrow_btn.pack(side="left", padx=(5, 5))
+
+        tk.Label(
+            top_bar,
+            text="⚙️ Ajustes del Sistema",
+            bg="#FFFFFF",
+            fg="#333333",
+            font=("Segoe UI", 14, "bold")
+        ).pack(side="left", padx=5)
+
+        # Contenido de Ajustes
+        ajustes_frame = tk.Frame(container, bg="#FFFFFF")
+        ajustes_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Ejemplo de ajustes (estos son solo placeholders)
+        tk.Label(
+            ajustes_frame,
+            text="Configuración General",
+            bg="#FFFFFF",
+            fg="#2C3E50",
+            font=("Segoe UI", 16, "bold")
+        ).pack(anchor="w", pady=10)
+
+        tk.Label(
+            ajustes_frame,
+            text="",
+            bg="#FFFFFF",
+            fg="#555555",
+            font=("Segoe UI", 11),
+            justify="left"
+        ).pack(anchor="w", pady=5)
+
+        btn_light = tk.Button(
+            ajustes_frame,
+            text="🌞 Modo Claro",
+            bg=self.colors["button"],
+            fg=self.colors["button_text"],
+            font=("Segoe UI", 11, "bold"),
+            relief="flat",
+            command=lambda: self.set_theme("light")
+        )
+        btn_light.pack(pady=10, anchor="w")
+
+        btn_dark = tk.Button(
+            ajustes_frame,
+            text="🌙 Modo Oscuro",
+            bg=self.colors["button"],
+            fg=self.colors["button_text"],
+            font=("Segoe UI", 11, "bold"),
+            relief="flat",
+            command=lambda: self.set_theme("dark")
+        )
+        btn_dark.pack(pady=10, anchor="w")
+
+
+
+
+        
 
         
     def _mostrar_dashboard_inicial(self):
@@ -891,7 +1306,7 @@ class RestauranteUI(tk.Tk):
 
         tk.Label(
             top_bar,
-            text="Gestión de Datos  |  CRUD DataFood",
+            text="Gestión",
             bg="#FFFFFF",
             fg="#333333",
             font=("Segoe UI", 14, "bold")
@@ -5494,9 +5909,8 @@ class RestauranteUI(tk.Tk):
         # ---------- Cargar datos al inicio ----------
         cargar_clientes()
 
-    # ---------------- ---------------------------TAB VENTAS ----------------
-   # ---------------- ---------------------------TAB VENTAS ----------------
-# ---------------- ---------------------------TAB VENTAS ----------------
+   
+
 # --------------------------- TAB VENTAS ---------------------------
     def _create_tab_ventas(self, notebook):
         frame = ttk.Frame(notebook)
@@ -6378,6 +6792,206 @@ class RestauranteUI(tk.Tk):
         btn_eliminar.config(command=eliminar_venta, text="🗑️ Eliminar")
 
         return frame
+
+
+
+# ============================================================
+#                  🌟 V E N T A N A   D E   R E P O R T E S
+# ============================================================
+class VentanaReportes(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+
+        # ========== CONFIGURACIÓN GENERAL ==========
+        self.title("Reportes – DataFood")
+        self.geometry(parent.geometry())      # mismo tamaño que la ventana principal
+        self.configure(bg="#F5F1E8")
+        self.sidebar_visible = True
+
+        # ========== PANEL LATERAL ==========
+        self.menu_frame = tk.Frame(self, bg="#DCC9A3", width=220)
+        self.menu_frame.pack(side="left", fill="y")
+        self.menu_frame.pack_propagate(False)
+
+        # Título del menú
+        tk.Label(
+            self.menu_frame,
+            text="📊 Reportes",
+            bg="#DCC9A3",
+            fg="#333333",
+            font=("Segoe UI", 16, "bold")
+        ).pack(pady=18)
+
+        # Botón volver
+        btn_volver = tk.Button(
+            self.menu_frame,
+            text="⬅ Volver",
+            bg="#C8B88A",
+            fg="white",
+            relief="flat",
+            font=("Segoe UI", 11, "bold"),
+            command=self.volver
+        )
+        btn_volver.pack(fill="x", padx=15, pady=10)
+
+        # ========== FLECHA RETRACTIL (siempre visible) ==========
+        self.btn_toggle = tk.Button(
+            self,
+            text="◀",
+            bg="#DCC9A3",
+            font=("Segoe UI", 12, "bold"),
+            relief="flat",
+            command=self.toggle_sidebar
+        )
+        self.btn_toggle.place(x=200, y=90)   # siempre visible
+
+        # ========== CONTENIDO PRINCIPAL ==========
+        self.body = tk.Frame(self, bg="#FFFFFF")
+        self.body.pack(side="left", fill="both", expand=True)
+
+        tk.Label(
+            self.body,
+            text="📈 Panel General de Reportes",
+            bg="#FFFFFF",
+            fg="#2C3E50",
+            font=("Segoe UI", 20, "bold")
+        ).pack(pady=20)
+
+        # ====== CONTENEDOR CON SCROLL PARA REPORTES ======
+
+        canvas = tk.Canvas(
+            self.body,
+            bg=self.colors["panel"],
+            highlightthickness=0
+        )
+        canvas.pack(side="left", fill="both", expand=True)
+
+        scrollbar = ttk.Scrollbar(
+            self.body,
+            orient="vertical",
+            command=canvas.yview
+        )
+        scrollbar.pack(side="right", fill="y")
+
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Frame interior donde vivirán TODOS los gráficos
+        scroll_frame = tk.Frame(canvas, bg=self.colors["panel"])
+        canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+
+        # Actualiza área del scroll
+        scroll_frame.bind(
+            "<Configure>",
+            lambda event: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        # IMPORTANTE: guardar referencia para usarlo después
+        self.scroll_frame = scroll_frame
+
+
+        # Cargar contenido
+        self.cargar_reportes()
+        self.cargar_graficos()
+
+    # =======================================================
+    #               FUNCIÓN: COLAPSAR SIDEBAR
+    # =======================================================
+    def toggle_sidebar(self):
+        if self.sidebar_visible:
+            self.menu_frame.pack_forget()
+            self.sidebar_visible = False
+            self.btn_toggle.config(text="▶")
+        else:
+            self.menu_frame.pack(side="left", fill="y")
+            self.sidebar_visible = True
+            self.btn_toggle.config(text="◀")
+
+    # =======================================================
+    #           FUNCIÓN: VOLVER A LA VENTANA PRINCIPAL
+    # =======================================================
+    def volver(self):
+        self.destroy()
+        self.parent.deiconify()
+
+    # =======================================================
+    #           REPORTE PRINCIPAL (TARJETAS NUMÉRICAS)
+    # =======================================================
+    def cargar_reportes(self):
+        conexion = conectar()
+        cursor = conexion.cursor()
+
+        cursor.execute("SELECT SUM(PrecioCompra * CantidadComprada) FROM ProveedoresInsumos")
+        gasto = cursor.fetchone()[0] or 0
+
+        cursor.execute("SELECT SUM(MontoTotal) FROM Venta")
+        ganancias = cursor.fetchone()[0] or 0
+
+        balance = ganancias - gasto
+
+        # Tarjetas
+        cards_frame = tk.Frame(self.report_container, bg="#FFFFFF")
+        cards_frame.pack(pady=10)
+
+        def crear_card(texto, valor, bg):
+            card = tk.Frame(cards_frame, bg=bg, width=260, height=110)
+            card.pack_propagate(False)
+            card.pack(side="left", padx=10)
+
+            tk.Label(card, text=texto, fg="white", bg=bg,
+                    font=("Segoe UI", 12, "bold")).pack(pady=(12, 0))
+
+            tk.Label(card, text=f"C$ {valor:.2f}", fg="white", bg=bg,
+                    font=("Segoe UI", 16, "bold")).pack()
+
+        crear_card("📄 Gastos en Insumos", gasto, "#A93226")
+        crear_card("💰 Ganancias Totales", ganancias, "#1E8449")
+        crear_card("📊 Balance Final", balance, "#2C3E50")
+
+        conexion.close()
+
+    # =======================================================
+    #             GRÁFICOS COMPLETOS SIN RECORTARSE
+    # =======================================================
+    def cargar_graficos(self):
+        import matplotlib.pyplot as plt
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+        charts_frame = tk.Frame(self.report_container, bg="#FFFFFF")
+        charts_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        charts_frame.columnconfigure(0, weight=1)
+        charts_frame.columnconfigure(1, weight=1)
+        charts_frame.rowconfigure(0, weight=1)
+
+        # ==== Frame del gráfico 1 ====
+        frame1 = tk.Frame(charts_frame, bg="#FFFFFF")
+        frame1.grid(row=0, column=0, sticky="nsew", padx=10)
+
+        # Ejemplo: Ventas por mes
+        fig1 = plt.Figure(figsize=(6, 4), dpi=100)
+        ax1 = fig1.add_subplot(111)
+        ax1.bar(["Oct", "Nov", "Dic"], [180, 200, 320], color="#3498db")
+        ax1.set_title("Ventas por Mes")
+
+        canvas1 = FigureCanvasTkAgg(fig1, frame1)
+        canvas1.draw()
+        canvas1.get_tk_widget().pack(fill="both", expand=True)
+
+        # ==== Frame del gráfico 2 ====
+        frame2 = tk.Frame(charts_frame, bg="#FFFFFF")
+        frame2.grid(row=0, column=1, sticky="nsew", padx=10)
+
+        fig2 = plt.Figure(figsize=(6, 4), dpi=100)
+        ax2 = fig2.add_subplot(111)
+        ax2.barh(["Tortilla", "Agua", "Pollo", "Quesillo"], [2, 3, 5, 4], color="#27ae60")
+        ax2.set_title("Top 5 productos más vendidos")
+
+        canvas2 = FigureCanvasTkAgg(fig2, frame2)
+        canvas2.draw()
+        canvas2.get_tk_widget().pack(fill="both", expand=True)
+
+
 
 # ----------------------- MAIN ---------------------------------------------------
 if __name__ == "__main__":
