@@ -1,11 +1,17 @@
 # DataFood
 Proyecto final de Bases de Datos
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/74df8b15-629c-40d5-8dfa-d1e1487077fc" />
+<img width="1365" height="723" alt="image" src="https://github.com/user-attachments/assets/22a74146-e9be-446d-b2be-f61bfd332e83" />
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/6409df2d-44cd-40f1-ae9e-51c81656326e" />
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/811b76eb-caf5-4257-a57e-0186df9bfbb0" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/a9c1afcf-7111-4eca-87a6-f0a302ece901" />
+
+
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/f220ab85-0111-4d6c-8052-262f4f663467" />
+
+<img width="1365" height="718" alt="image" src="https://github.com/user-attachments/assets/7a683266-fa12-4828-a70e-ef8a6a0651da" />
+
+
 
 Primero, en la terminal de VSC 
 Ejecutar:
