@@ -248,29 +248,93 @@ class RestauranteUI(tk.Tk):
         self.right_panel.pack(side="left", fill="y")
         self.right_panel.pack_propagate(False)
 
-        tk.Label(
+                # ======================================================
+        # PANEL DERECHO  —  DISEÑO PROFESIONAL COMPLETO
+        # ======================================================
+
+        # Limpiar contenido previo
+        for w in self.right_panel.winfo_children():
+            w.destroy()
+
+        # ---------- CONTENEDOR PRINCIPAL ----------
+        panel = tk.Frame(
             self.right_panel,
-            text="Panel derecho\n(próximas funciones)",
-            bg="#F5F1E8",
+            bg="#FFFFFF"
+        )
+        panel.pack(fill="both", expand=True, padx=25, pady=20)
+        panel.pack_propagate(False)
+
+        # ---------- IMAGEN CENTRADA ----------
+        from PIL import Image, ImageTk
+        import os
+
+        ruta_img = os.path.join(os.path.dirname(__file__), "queso.png")
+        try:
+            img = Image.open(ruta_img)
+            img = img.resize((150, 150), Image.Resampling.LANCZOS)
+            photo = ImageTk.PhotoImage(img)
+
+            img_label = tk.Label(panel, image=photo, bg="#FFFFFF")
+            img_label.image = photo
+            img_label.pack(pady=(10, 20))
+        except Exception as e:
+            tk.Label(panel, text="[Imagen no disponible]", bg="#FFFFFF").pack()
+
+        # ---------- TÍTULO PRINCIPAL ----------
+        titulo = tk.Label(
+            panel,
+            text="Bienvenido\n a DataFood",
+            bg="#FFFFFF",
+            fg="#2C3E50",
+            font=("Segoe UI Semibold", 20)
+        )
+        titulo.pack()
+
+        # ---------- SUBTÍTULO CON DECORACIÓN ----------
+        subtitulo = tk.Label(
+            panel,
+            text="Tu asistente",
+            bg="#FFFFFF",
+            fg="#7F8C8D",
+            font=("Segoe UI", 11, "italic")
+        )
+        subtitulo.pack(pady=(0, 15))
+
+        # ---------- SEPARADOR ELEGANTE ----------
+        separator = tk.Frame(panel, bg="#C8B88A", height=2, width=240)
+        separator.pack(pady=(0, 25))
+
+        # ---------- TEXTO PRINCIPAL (CÓMODO Y SEPARADO) ----------
+        descripcion = tk.Label(
+            panel,
+            text=(
+                "• Registra ventas .\n"
+                "• Controla la producción.\n"
+                "• Administra insumos .\n"
+                "• Obtén reportes .\n"
+                "• Organiza clientes\n"
+            ),
+            bg="#FFFFFF",
             fg="#444444",
-            font=("Segoe UI", 11, "bold"),
-            justify="center"
-        ).pack(padx=10, pady=20)
+            justify="left",
+            anchor="w",
+            font=("Segoe UI", 12)
+        )
+        descripcion.pack(fill="x", padx=10)
 
-      
-        tk.Label(
-            self.right_panel,
-            text="no se que poner pero algo voy a poner\n"
-                "- Detalle del pedido actual\n"
-                "- Resumen de venta\n"
-                "- Métodos de pago, etc.",
-            bg="#F5F1E8",
-            fg="#666666",
-            font=("Segoe UI", 9),
-            justify="left"
-        ).pack(padx=15, pady=5)
+        # ---------- FOOTER MOTIVACIONAL ----------
+        footer = tk.Label(
+            panel,
+            text="✨ Listo para comenzar ✓",
+            bg="#FFFFFF",
+            fg="#157347",
+            font=("Segoe UI Semibold", 13)
+        )
+        footer.pack(side="bottom", pady=15)
 
-    
+
+
+            
 
         # estado de paneles
         self.sidebar_visible = True
@@ -5286,16 +5350,25 @@ class RestauranteUI(tk.Tk):
                     tipo_n = cmb_tipo_nuevo.get().strip()
                     categoria_n = cmb_categoria_nuevo.get().strip()
                     nombre_n = txt_nombre_nuevo.get().strip()
-                    precio = entry_precio.get()
+                    precio = entry_precio.get().strip()
                     img_data = imagen_bytes["data"]
-         
 
+                    # -------------------------------
+                    # VALIDACIONES
+                    # -------------------------------
                     if tipo_n not in ("Plato", "Bebida"):
                         return msg.showwarning("Atención", "Seleccione el tipo de producción.")
+
                     if not categoria_n:
                         return msg.showwarning("Atención", "Seleccione la categoría.")
+
                     if not nombre_n:
                         return msg.showwarning("Atención", "Ingrese el nombre de la producción.")
+
+                    if not precio.replace(".", "", 1).isdigit():
+                        return msg.showwarning("Atención", "Ingrese un precio válido (solo números).")
+
+                    precio_float = float(precio)
 
                     if img_data is None:
                         if not msg.askyesno(
@@ -5305,54 +5378,70 @@ class RestauranteUI(tk.Tk):
                         ):
                             return
 
+                    # -------------------------------
+                    # GUARDAR PRODUCCIÓN — PLATOS
+                    # -------------------------------
                     if tipo_n == "Plato":
                         if categoria_n not in id_cat_plato_por_nombre:
                             return msg.showerror("Error", "Categoría de plato no encontrada.")
                         id_cat = id_cat_plato_por_nombre[categoria_n]
 
+                        # Insertar en Producción con precio REAL
                         cursor.execute("""
                             INSERT INTO Produccion
                                 (NombrePlato, CantidadDePlatos, CostoPorPlato,
-                                 CantidadDeBebidas, CostoPorBebida, CostoProduccionTotal, Imagen)
+                                CantidadDeBebidas, CostoPorBebida, CostoProduccionTotal, Imagen)
                             OUTPUT INSERTED.IDProduccion
-                            VALUES (?, 0, 0, 0, NULL, 0, ?);
-                        """, (nombre_n, img_data))
+                            VALUES (?, 0, ?, 0, NULL, ?, ?);
+                        """, (nombre_n, precio_float, precio_float, img_data))
+
                         id_prod_nuevo = cursor.fetchone()[0]
 
+                        # Insertar en MenuDePlatos con PRECIO REAL
                         cursor.execute("""
-                            INSERT INTO MenuDePlatos (IDProduccion, IDCategoriaPlatos, NombrePlato, Precio)
-                            VALUES (?, ?, ?, 0);
-                        """, (id_prod_nuevo, id_cat, nombre_n))
+                            INSERT INTO MenuDePlatos
+                                (IDProduccion, IDCategoriaPlatos, NombrePlato, Precio)
+                            VALUES (?, ?, ?, ?);
+                        """, (id_prod_nuevo, id_cat, nombre_n, precio_float))
 
-                    else:  # Bebida
+                    # -------------------------------
+                    # GUARDAR PRODUCCIÓN — BEBIDAS
+                    # -------------------------------
+                    else:
                         if categoria_n not in id_cat_bebida_por_nombre:
                             return msg.showerror("Error", "Categoría de bebida no encontrada.")
                         id_cat = id_cat_bebida_por_nombre[categoria_n]
 
+                        # Insertar en Producción con precio REAL
                         cursor.execute("""
                             INSERT INTO Produccion
                                 (NombreBebida, CantidadDeBebidas, CostoPorBebida,
-                                 CantidadDePlatos, CostoPorPlato, CostoProduccionTotal, Imagen)
+                                CantidadDePlatos, CostoPorPlato, CostoProduccionTotal, Imagen)
                             OUTPUT INSERTED.IDProduccion
-                            VALUES (?, 0, 0, 0, NULL, 0, ?);
-                        """, (nombre_n, img_data))
+                            VALUES (?, 0, ?, 0, NULL, ?, ?);
+                        """, (nombre_n, precio_float, precio_float, img_data))
+
                         id_prod_nuevo = cursor.fetchone()[0]
 
+                        # Insertar en MenuDeBebidas con PRECIO REAL
                         cursor.execute("""
-                            INSERT INTO MenuDeBebidas (IDProduccion, IDCategoriaBebidas, NombreBebida, Precio)
-                            VALUES (?, ?, ?, 0);
-                        """, (id_prod_nuevo, id_cat, nombre_n))
+                            INSERT INTO MenuDeBebidas
+                                (IDProduccion, IDCategoriaBebidas, NombreBebida, Precio)
+                            VALUES (?, ?, ?, ?);
+                        """, (id_prod_nuevo, id_cat, nombre_n, precio_float))
 
+                    # -------------------------------
+                    # CONFIRMAR Y CERRAR
+                    # -------------------------------
                     conexion.commit()
                     msg.showinfo("Éxito", "Nueva producción registrada correctamente.")
 
-                    # Solo actualizamos el combo de nombres;
-                    # NO recargamos el TreeView para que no aparezca sin stock.
                     cargar_nombres()
                     ventana.destroy()
 
                 except Exception as e:
                     msg.showerror("Error", f"No se pudo guardar la nueva producción:\n{e}")
+
 
             btn_guardar.config(command=guardar_nueva_produccion)
 
